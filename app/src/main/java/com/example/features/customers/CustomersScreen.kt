@@ -157,6 +157,7 @@ fun CustomersScreen(
             )
             val detailState by detailVm.uiState.collectAsStateWithLifecycle()
             val previewMeasurementSlip by detailVm.previewMeasurementSlip.collectAsStateWithLifecycle()
+            val pendingShareParchi by detailVm.pendingShareParchi.collectAsStateWithLifecycle()
             val isPrinting by detailVm.isPrinting.collectAsStateWithLifecycle()
             val savedActiveMsg = stringResource(R.string.measurement_saved_active_msg)
             CustomerDetailContent(
@@ -171,8 +172,11 @@ fun CustomersScreen(
               onDeleteMeasurement = detailVm::deleteMeasurement,
               onPreviewMeasurement = detailVm::openMeasurementPreview,
               onPrintMeasurement = detailVm::printMeasurementSlip,
+              onShareMeasurement = detailVm::shareMeasurementSlip,
               onDismissMeasurementPreview = detailVm::dismissMeasurementPreview,
               previewMeasurementSlip = previewMeasurementSlip,
+              pendingShareParchi = pendingShareParchi,
+              onConsumeShareParchi = detailVm::clearPendingShareParchi,
               isPrinting = isPrinting,
               onShowMessage = detailVm::showMessage,
             )

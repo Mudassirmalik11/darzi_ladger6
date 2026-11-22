@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.LocationOn
@@ -44,10 +45,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -78,6 +81,8 @@ import com.example.data.local.entities.MeasurementEntity
 import com.example.features.measurements.SavedMeasurementMetricsGrid
 import com.example.features.measurements.SavedStylePreferencesGrid
 import com.example.features.orders.OrderSummaryCard
+import com.example.features.printing.ParchiImageSharer
+import com.example.features.printing.ParchiSlipData
 import com.example.features.printing.SlipPreviewPayload
 import com.example.features.printing.ThermalSlipPaperPreview
 import com.example.ui.theme.AtelierLandingDarkCanvas
@@ -87,6 +92,7 @@ import com.example.ui.theme.AtelierOliveDialogSurface
 import com.example.ui.theme.JetBrainsMonoFamily
 import com.example.ui.theme.OnAtelierOlive
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 @Composable
 fun CustomerDetailContent(
@@ -100,14 +106,32 @@ fun CustomerDetailContent(
   onDeleteMeasurement: (measurementId: String) -> Unit = {},
   onPreviewMeasurement: (MeasurementEntity) -> Unit = {},
   onPrintMeasurement: (MeasurementEntity) -> Unit = {},
+  onShareMeasurement: (MeasurementEntity) -> Unit = {},
   onDismissMeasurementPreview: () -> Unit = {},
   previewMeasurementSlip: Pair<MeasurementEntity, SlipPreviewPayload>? = null,
+  pendingShareParchi: ParchiSlipData? = null,
+  onConsumeShareParchi: () -> Unit = {},
   isPrinting: Boolean = false,
   onShowMessage: (String) -> Unit = {},
 ) {
   val customer = uiState.customer ?: return
   val context = LocalContext.current
+  val scope = rememberCoroutineScope()
   val whatsappErrorMsg = stringResource(R.string.customer_whatsapp_error)
+  val shareChooserTitle = stringResource(R.string.measurement_share_chooser_title)
+  val shareErrorMsg = stringResource(R.string.measurement_share_error)
+
+  LaunchedEffect(pendingShareParchi) {
+    val parchi = pendingShareParchi ?: return@LaunchedEffect
+    onConsumeShareParchi()
+    ParchiImageSharer.shareParchiImage(
+      context = context,
+      parchiData = parchi,
+      chooserTitle = shareChooserTitle,
+    ).onFailure {
+      onShowMessage(shareErrorMsg)
+    }
+  }
 
   var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
   var optionsTargetMeasurementId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -528,6 +552,10 @@ fun CustomerDetailContent(
         optionsTargetMeasurementId = null
         onPreviewMeasurement(optionsTarget)
       },
+      onShare = {
+        optionsTargetMeasurementId = null
+        onShareMeasurement(optionsTarget)
+      },
       onDelete = {
         val targetId = optionsTarget.measurementId
         optionsTargetMeasurementId = null
@@ -583,6 +611,19 @@ fun CustomerDetailContent(
       onPrintNow = {
         onDismissMeasurementPreview()
         onPrintMeasurement(measurement)
+      },
+      onShareImage = previewPayload.parchiData?.let { parchi ->
+        {
+          scope.launch {
+            ParchiImageSharer.shareParchiImage(
+              context = context,
+              parchiData = parchi,
+              chooserTitle = shareChooserTitle,
+            ).onFailure {
+              onShowMessage(shareErrorMsg)
+            }
+          }
+        }
       },
     )
   }
@@ -842,6 +883,7 @@ private fun MeasurementOptionsDialog(
   onEdit: () -> Unit,
   onSave: () -> Unit,
   onPrint: () -> Unit,
+  onShare: () -> Unit,
   onDelete: () -> Unit,
 ) {
   Dialog(
@@ -914,6 +956,11 @@ private fun MeasurementOptionsDialog(
           testTag = "measurement_option_print",
         )
         OptionOliveButton(
+          label = stringResource(R.string.measurement_option_share),
+          onClick = onShare,
+          testTag = "measurement_option_share",
+        )
+        OptionOliveButton(
           label = stringResource(R.string.measurement_option_delete),
           onClick = onDelete,
           testTag = "measurement_option_delete",
@@ -957,6 +1004,7 @@ private fun MeasurementSlipPreviewDialog(
   previewPayload: SlipPreviewPayload,
   onDismiss: () -> Unit,
   onPrintNow: () -> Unit,
+  onShareImage: (() -> Unit)? = null,
 ) {
   val previewText = previewPayload.previewText
   val context = LocalContext.current
@@ -973,6 +1021,7 @@ private fun MeasurementSlipPreviewDialog(
     context.createConfigurationContext(localizedConfig)
   }
   val previewTitle = localizedContext.getString(R.string.measurement_preview_title)
+  val shareLabel = localizedContext.getString(R.string.measurement_option_share)
   val printNowLabel = localizedContext.getString(R.string.action_print_now)
   val closeLabel = localizedContext.getString(R.string.action_close)
   val textDirection = if (slipDirection == LayoutDirection.Rtl) {
@@ -990,7 +1039,29 @@ private fun MeasurementSlipPreviewDialog(
         LocalConfiguration provides localizedConfig,
         LocalLayoutDirection provides slipDirection,
       ) {
-        Text(text = previewTitle)
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(
+            text = previewTitle,
+            modifier = Modifier.weight(1f),
+          )
+          if (onShareImage != null) {
+            IconButton(
+              onClick = onShareImage,
+              modifier = Modifier
+                .size(48.dp)
+                .testTag("slip_preview_share_button"),
+            ) {
+              Icon(
+                imageVector = Icons.Filled.Share,
+                contentDescription = shareLabel,
+              )
+            }
+          }
+        }
       }
     },
     text = {

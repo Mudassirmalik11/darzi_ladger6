@@ -420,7 +420,10 @@
     <string name="measurement_option_edit">Edit</string>
     <string name="measurement_option_save">Save</string>
     <string name="measurement_option_print">Print</string>
+    <string name="measurement_option_share">Share</string>
     <string name="measurement_option_delete">Delete</string>
+    <string name="measurement_share_chooser_title">Share Measurement Parchi</string>
+    <string name="measurement_share_error">Could not share measurement slip image.</string>
     <string name="measurement_saved_active_msg">Saved as customer active measurement.</string>
     <string name="measurement_delete_confirm_title">Delete Measurement?</string>
     <string name="measurement_delete_confirm_desc">This removes the measurement card from this customer profile. Existing orders remain unchanged.</string>

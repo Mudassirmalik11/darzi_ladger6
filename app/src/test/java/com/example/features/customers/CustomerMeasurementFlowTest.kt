@@ -354,6 +354,7 @@ class CustomerMeasurementFlowTest {
     composeTestRule.onNodeWithTag("measurement_option_edit").assertIsDisplayed()
     composeTestRule.onNodeWithTag("measurement_option_save").assertIsDisplayed()
     composeTestRule.onNodeWithTag("measurement_option_print").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("measurement_option_share").assertIsDisplayed()
     composeTestRule.onNodeWithTag("measurement_option_delete").assertIsDisplayed()
 
     // Test Print -> opens Measurement Slip Preview dialog

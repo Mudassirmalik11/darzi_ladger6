@@ -57,6 +57,7 @@ fun CustomerDetailScreen(
   val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
   val isPrinting by viewModel.isPrinting.collectAsStateWithLifecycle()
   val previewMeasurementSlip by viewModel.previewMeasurementSlip.collectAsStateWithLifecycle()
+  val pendingShareParchi by viewModel.pendingShareParchi.collectAsStateWithLifecycle()
 
   var showEditDialog by rememberSaveable { mutableStateOf(false) }
   var showOverflowMenu by rememberSaveable { mutableStateOf(false) }
@@ -172,8 +173,11 @@ fun CustomerDetailScreen(
       onDeleteMeasurement = viewModel::deleteMeasurement,
       onPreviewMeasurement = viewModel::openMeasurementPreview,
       onPrintMeasurement = viewModel::printMeasurementSlip,
+      onShareMeasurement = viewModel::shareMeasurementSlip,
       onDismissMeasurementPreview = viewModel::dismissMeasurementPreview,
       previewMeasurementSlip = previewMeasurementSlip,
+      pendingShareParchi = pendingShareParchi,
+      onConsumeShareParchi = viewModel::clearPendingShareParchi,
       isPrinting = isPrinting,
       onShowMessage = viewModel::showMessage,
       modifier = Modifier.padding(innerPadding),

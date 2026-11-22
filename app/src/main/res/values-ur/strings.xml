@@ -420,7 +420,10 @@
     <string name="measurement_option_edit">ترمیم</string>
     <string name="measurement_option_save">محفوظ کریں</string>
     <string name="measurement_option_print">پرنٹ</string>
+    <string name="measurement_option_share">شیئر کریں</string>
     <string name="measurement_option_delete">حذف کریں</string>
+    <string name="measurement_share_chooser_title">ناپ کی پرچی شیئر کریں</string>
+    <string name="measurement_share_error">ناپ کی پرچی کی تصویر شیئر نہیں ہو سکی۔</string>
     <string name="measurement_saved_active_msg">فعال ناپ کے طور پر محفوظ کر دیا گیا۔</string>
     <string name="measurement_delete_confirm_title">ناپ حذف کریں؟</string>
     <string name="measurement_delete_confirm_desc">یہ ناپ کارڈ گاہک کی فہرست سے ہٹ جائے گا۔ پرانے آرڈرز محفوظ رہیں گے۔</string>

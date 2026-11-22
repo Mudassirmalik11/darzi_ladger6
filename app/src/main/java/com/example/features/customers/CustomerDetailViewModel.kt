@@ -11,6 +11,7 @@ import com.example.data.local.entities.OrderEntity
 import com.example.data.local.repository.CustomerRepository
 import com.example.data.local.repository.DeviceSyncRepository
 import com.example.data.local.repository.OrderRepository
+import com.example.features.printing.ParchiSlipData
 import com.example.features.printing.SlipPreviewPayload
 import com.example.features.printing.ThermalPrintManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -98,6 +99,9 @@ class CustomerDetailViewModel(
   private val _previewMeasurementSlip = MutableStateFlow<Pair<MeasurementEntity, SlipPreviewPayload>?>(null)
   val previewMeasurementSlip: StateFlow<Pair<MeasurementEntity, SlipPreviewPayload>?> =
     _previewMeasurementSlip.asStateFlow()
+
+  private val _pendingShareParchi = MutableStateFlow<ParchiSlipData?>(null)
+  val pendingShareParchi: StateFlow<ParchiSlipData?> = _pendingShareParchi.asStateFlow()
 
   fun clearEditError() {
     _editError.value = null
@@ -203,6 +207,31 @@ class CustomerDetailViewModel(
 
   fun dismissMeasurementPreview() {
     _previewMeasurementSlip.value = null
+  }
+
+  fun shareMeasurementSlip(measurement: MeasurementEntity) {
+    val customer = uiState.value.customer ?: return
+    val manager = thermalPrintManager ?: return
+    viewModelScope.launch {
+      val preview = manager.buildMeasurementPreviewPayload(
+        customer = customer,
+        customerDisplayId = uiState.value.displayId,
+        measurement = measurement,
+      )
+      val parchi = preview.parchiData
+      if (parchi != null) {
+        _pendingShareParchi.value = parchi
+      } else {
+        _statusMessage.value = localizedAppText(
+          "Could not share measurement slip image.",
+          "ناپ کی پرچی کی تصویر شیئر نہیں ہو سکی۔",
+        )
+      }
+    }
+  }
+
+  fun clearPendingShareParchi() {
+    _pendingShareParchi.value = null
   }
 
   fun printMeasurementSlip(measurement: MeasurementEntity) {

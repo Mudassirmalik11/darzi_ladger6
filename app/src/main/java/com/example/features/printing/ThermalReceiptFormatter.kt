@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
@@ -1324,6 +1326,372 @@ object ThermalReceiptFormatter {
       bitmap.recycle()
     }
   }.getOrNull()
+
+  fun renderParchiShareBitmap(
+    data: ParchiSlipData,
+    widthPx: Int = 760,
+  ): Bitmap {
+    val outerPad = 24
+    val cardLeft = outerPad.toFloat()
+    val cardRight = (widthPx - outerPad).toFloat()
+    val contentWidth = (cardRight - cardLeft).toInt()
+    val isRtl = data.isUrdu
+    val direction = if (isRtl) TextDirectionHeuristics.RTL else TextDirectionHeuristics.LTR
+
+    val paperBgColor = Color.rgb(0xFC, 0xFB, 0xF8)
+    val paperBorderColor = Color.rgb(0xCC, 0xC9, 0xBE)
+    val inkPrimary = Color.rgb(0x10, 0x13, 0x0E)
+    val inkSecondary = Color.rgb(0x2E, 0x35, 0x27)
+    val highlightCardBg = Color.rgb(0xEE, 0xF3, 0xE3)
+    val highlightBannerBg = Color.rgb(0x17, 0x1E, 0x12)
+    val highlightBannerFg = Color.rgb(0xFC, 0xFB, 0xF8)
+    val sectionTintBg = Color.rgb(0xE4, 0xEB, 0xD6)
+    val accentInk = Color.rgb(0x1B, 0x24, 0x15)
+    val gridLineColor = Color.rgb(0xC2, 0xC6, 0xB7)
+    val altRowBg = Color.rgb(0xF7, 0xF8, 0xF3)
+
+    val bannerPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = highlightBannerFg
+      textSize = 32f
+      typeface = Typeface.DEFAULT_BOLD
+    }
+    val infoBoldPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = inkPrimary
+      textSize = 28f
+      typeface = Typeface.DEFAULT_BOLD
+    }
+    val infoBodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = inkPrimary
+      textSize = 26f
+      typeface = Typeface.DEFAULT_BOLD
+    }
+    val shopPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = inkPrimary
+      textSize = 27f
+      typeface = Typeface.DEFAULT_BOLD
+    }
+    val datePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = inkSecondary
+      textSize = 23f
+      typeface = Typeface.DEFAULT_BOLD
+    }
+    val cellLabelPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = inkSecondary
+      textSize = 24f
+      typeface = Typeface.DEFAULT_BOLD
+    }
+    val cellValuePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = inkPrimary
+      textSize = 40f
+      typeface = Typeface.DEFAULT_BOLD
+    }
+    val notesTitlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = accentInk
+      textSize = 28f
+      typeface = Typeface.DEFAULT_BOLD
+    }
+    val notesBodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = inkPrimary
+      textSize = 26f
+      typeface = Typeface.DEFAULT_BOLD
+    }
+
+    fun makeLayout(
+      text: String,
+      paint: TextPaint,
+      maxWidth: Int,
+      alignment: Layout.Alignment = Layout.Alignment.ALIGN_NORMAL,
+      textDirectionHeuristic: android.text.TextDirectionHeuristic = direction,
+    ): StaticLayout = StaticLayout.Builder.obtain(text, 0, text.length, paint, maxWidth.coerceAtLeast(32))
+      .setAlignment(alignment)
+      .setTextDirection(textDirectionHeuristic)
+      .setLineSpacing(5f, 1.0f)
+      .setIncludePad(true)
+      .build()
+
+    // 1. Customer Info Card
+    val infoInnerWidth = contentWidth - 40
+    val bannerLayout = makeLayout(data.customerInfoTitle, bannerPaint, infoInnerWidth, Layout.Alignment.ALIGN_CENTER)
+    val infoLines = buildList {
+      if (!data.orderIdLabel.isNullOrBlank() && !data.orderIdValue.isNullOrBlank()) {
+        add(makeLayout("${data.orderIdLabel}: ${isolateLtr(data.orderIdValue, isRtl)}", infoBoldPaint, infoInnerWidth))
+      }
+      if (!data.customerIdLabel.isNullOrBlank() && !data.customerIdValue.isNullOrBlank()) {
+        add(makeLayout("${data.customerIdLabel}: ${isolateLtr(data.customerIdValue, isRtl)}", infoBoldPaint, infoInnerWidth))
+      }
+      add(makeLayout("${data.nameLabel}: ${data.nameValue}", infoBoldPaint, infoInnerWidth))
+      if (data.mobileValue.isNotBlank()) {
+        add(makeLayout("${data.mobileLabel}: ${isolateLtr(data.mobileValue, isRtl)}", infoBodyPaint, infoInnerWidth))
+      } else {
+        add(makeLayout("${data.mobileLabel}:", infoBodyPaint, infoInnerWidth))
+      }
+      if (!data.addressLabel.isNullOrBlank() && !data.addressValue.isNullOrBlank()) {
+        add(makeLayout("${data.addressLabel}: ${data.addressValue}", infoBodyPaint, infoInnerWidth))
+      }
+      if (!data.suitsLabel.isNullOrBlank() && !data.suitsValue.isNullOrBlank() &&
+        !data.dueLabel.isNullOrBlank() && !data.dueValue.isNullOrBlank()
+      ) {
+        add(
+          makeLayout(
+            "${data.suitsLabel}: ${data.suitsValue}   |   ${data.dueLabel}: ${data.dueValue}",
+            infoBoldPaint,
+            infoInnerWidth,
+          ),
+        )
+      }
+    }
+    val bannerHeight = bannerLayout.height + 24
+    val infoBodyHeight = infoLines.sumOf { it.height + 8 } + 22
+    val infoCardHeight = bannerHeight + infoBodyHeight
+
+    // 2. Shop + Garment Title & Date Bar
+    val dateWidth = (contentWidth * 0.38f).toInt()
+    val shopWidth = contentWidth - dateWidth - 14
+    val shopLayout = makeLayout(data.headerBannerText, shopPaint, shopWidth)
+    val dateLayout = makeLayout(data.dateText, datePaint, dateWidth, Layout.Alignment.ALIGN_OPPOSITE)
+    val shopRowHeight = maxOf(shopLayout.height, dateLayout.height) + 18
+
+    // 3. 2-Column Stacked Measurement Grid
+    val colWidth = contentWidth / 2
+    val cellTextWidth = colWidth - 20
+
+    data class ShareCell(val label: StaticLayout, val value: StaticLayout, val cellHeight: Int)
+    data class ShareRow(val startCell: ShareCell, val endCell: ShareCell?, val rowHeight: Int)
+
+    fun buildShareRows(cells: List<ParchiMetricCell>): List<ShareRow> {
+      val rows = mutableListOf<ShareRow>()
+      var idx = 0
+      while (idx < cells.size) {
+        val c1 = cells[idx]
+        val l1 = makeLayout(c1.label, cellLabelPaint, cellTextWidth, Layout.Alignment.ALIGN_CENTER)
+        val v1 = makeLayout(
+          c1.value,
+          cellValuePaint,
+          cellTextWidth,
+          Layout.Alignment.ALIGN_CENTER,
+          TextDirectionHeuristics.LTR,
+        )
+        val r1 = ShareCell(l1, v1, l1.height + v1.height + 24)
+
+        val r2 = if (idx + 1 < cells.size) {
+          val c2 = cells[idx + 1]
+          val l2 = makeLayout(c2.label, cellLabelPaint, cellTextWidth, Layout.Alignment.ALIGN_CENTER)
+          val v2 = makeLayout(
+            c2.value,
+            cellValuePaint,
+            cellTextWidth,
+            Layout.Alignment.ALIGN_CENTER,
+            TextDirectionHeuristics.LTR,
+          )
+          ShareCell(l2, v2, l2.height + v2.height + 24)
+        } else {
+          null
+        }
+        rows.add(ShareRow(r1, r2, maxOf(r1.cellHeight, r2?.cellHeight ?: 0)))
+        idx += 2
+      }
+      return rows
+    }
+
+    val compulsoryRows = buildShareRows(data.compulsoryMetrics)
+    val optionalRows = buildShareRows(data.optionalMetrics)
+
+    // 4. Additional Notes Section
+    val notesInnerWidth = contentWidth - 36
+    val notesTitleLayout = if (data.additionalNoteLines.isNotEmpty()) {
+      makeLayout(data.additionalNotesTitle, notesTitlePaint, notesInnerWidth)
+    } else {
+      null
+    }
+    val notesLayouts = data.additionalNoteLines.map { line ->
+      makeLayout(line, notesBodyPaint, notesInnerWidth)
+    }
+    val notesBannerHeight = if (notesTitleLayout != null) notesTitleLayout.height + 18 else 0
+    val notesBodyHeight = if (notesTitleLayout != null) notesLayouts.sumOf { it.height + 8 } + 20 else 0
+
+    var totalHeight = outerPad + infoCardHeight + 20 + shopRowHeight + 16
+    totalHeight += compulsoryRows.sumOf { it.rowHeight }
+    if (optionalRows.isNotEmpty()) {
+      totalHeight += 18 + optionalRows.sumOf { it.rowHeight }
+    }
+    if (notesTitleLayout != null) {
+      totalHeight += 20 + notesBannerHeight + notesBodyHeight
+    }
+    totalHeight = (totalHeight + outerPad).coerceAtLeast(120)
+
+    val bitmap = Bitmap.createBitmap(widthPx, totalHeight, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    canvas.drawColor(paperBgColor)
+
+    // Outer subtle paper frame
+    val outerBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = paperBorderColor
+      style = Paint.Style.STROKE
+      strokeWidth = 2f
+    }
+    canvas.drawRect(1f, 1f, widthPx - 1f, totalHeight - 1f, outerBorderPaint)
+
+    val cardRadius = 16f
+    val infoCardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = highlightCardBg
+      style = Paint.Style.FILL
+    }
+    val infoBannerFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = highlightBannerBg
+      style = Paint.Style.FILL
+    }
+    val infoBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = accentInk
+      style = Paint.Style.STROKE
+      strokeWidth = 2.5f
+    }
+    val accentFillPaint = Paint().apply {
+      color = accentInk
+      style = Paint.Style.FILL
+    }
+    val gridBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = gridLineColor
+      style = Paint.Style.STROKE
+      strokeWidth = 2f
+    }
+    val altRowPaint = Paint().apply {
+      color = altRowBg
+      style = Paint.Style.FILL
+    }
+    val whiteRowPaint = Paint().apply {
+      color = paperBgColor
+      style = Paint.Style.FILL
+    }
+    val notesHeaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      color = sectionTintBg
+      style = Paint.Style.FILL
+    }
+
+    var y = outerPad.toFloat()
+
+    // 1. Draw Customer Info Card with clipped rounded top banner
+    val infoRect = RectF(cardLeft, y, cardRight, y + infoCardHeight)
+    val infoClipPath = Path().apply { addRoundRect(infoRect, cardRadius, cardRadius, Path.Direction.CW) }
+    canvas.save()
+    canvas.clipPath(infoClipPath)
+    canvas.drawRect(infoRect, infoCardBgPaint)
+    canvas.drawRect(cardLeft, y, cardRight, y + bannerHeight, infoBannerFillPaint)
+    canvas.save()
+    canvas.translate(cardLeft + 20f, y + 12f)
+    bannerLayout.draw(canvas)
+    canvas.restore()
+    var iy = y + bannerHeight + 12f
+    for (infoLayout in infoLines) {
+      canvas.save()
+      canvas.translate(cardLeft + 20f, iy)
+      infoLayout.draw(canvas)
+      canvas.restore()
+      iy += infoLayout.height + 8f
+    }
+    canvas.restore()
+    canvas.drawRoundRect(infoRect, cardRadius, cardRadius, infoBorderPaint)
+    y += infoCardHeight + 20f
+
+    // 2. Draw Shop + Garment & Date Bar
+    val shopX = if (isRtl) (cardRight - shopWidth) else cardLeft
+    val dateX = if (isRtl) cardLeft else (cardRight - dateWidth)
+    canvas.save()
+    canvas.translate(shopX, y)
+    shopLayout.draw(canvas)
+    canvas.restore()
+    canvas.save()
+    canvas.translate(dateX, y + 2f)
+    dateLayout.draw(canvas)
+    canvas.restore()
+    y += shopRowHeight - 6f
+    canvas.drawRect(cardLeft, y, cardRight, y + 3f, accentFillPaint)
+    y += 16f
+
+    fun drawShareGrid(rows: List<ShareRow>) {
+      if (rows.isEmpty()) return
+      val gridTop = y
+      val gridHeight = rows.sumOf { it.rowHeight }.toFloat()
+      val gridRect = RectF(cardLeft, gridTop, cardRight, gridTop + gridHeight)
+      val gridClipPath = Path().apply { addRoundRect(gridRect, cardRadius, cardRadius, Path.Direction.CW) }
+      val midX = cardLeft + colWidth.toFloat()
+
+      canvas.save()
+      canvas.clipPath(gridClipPath)
+      rows.forEachIndexed { rowIndex, row ->
+        val rowTop = y
+        val rowBottom = y + row.rowHeight
+        canvas.drawRect(
+          cardLeft,
+          rowTop,
+          cardRight,
+          rowBottom,
+          if (rowIndex % 2 == 0) whiteRowPaint else altRowPaint,
+        )
+        if (rowIndex > 0) {
+          canvas.drawLine(cardLeft, rowTop, cardRight, rowTop, gridBorderPaint)
+        }
+        canvas.drawLine(midX, rowTop, midX, rowBottom, gridBorderPaint)
+
+        val startCellX = cardLeft + 10f
+        val endCellX = midX + 10f
+        val startContentHeight = row.startCell.label.height + row.startCell.value.height + 4f
+        val startTop = rowTop + ((row.rowHeight - startContentHeight) / 2f).coerceAtLeast(8f)
+        canvas.save()
+        canvas.translate(startCellX, startTop)
+        row.startCell.label.draw(canvas)
+        canvas.translate(0f, row.startCell.label.height + 4f)
+        row.startCell.value.draw(canvas)
+        canvas.restore()
+
+        row.endCell?.let { endCell ->
+          val endContentHeight = endCell.label.height + endCell.value.height + 4f
+          val endTop = rowTop + ((row.rowHeight - endContentHeight) / 2f).coerceAtLeast(8f)
+          canvas.save()
+          canvas.translate(endCellX, endTop)
+          endCell.label.draw(canvas)
+          canvas.translate(0f, endCell.label.height + 4f)
+          endCell.value.draw(canvas)
+          canvas.restore()
+        }
+        y = rowBottom
+      }
+      canvas.restore()
+      canvas.drawRoundRect(gridRect, cardRadius, cardRadius, gridBorderPaint)
+    }
+
+    drawShareGrid(compulsoryRows)
+    if (optionalRows.isNotEmpty()) {
+      y += 18f
+      drawShareGrid(optionalRows)
+    }
+
+    if (notesTitleLayout != null) {
+      y += 20f
+      val notesTotalHeight = (notesBannerHeight + notesBodyHeight).toFloat()
+      val notesRect = RectF(cardLeft, y, cardRight, y + notesTotalHeight)
+      val notesClipPath = Path().apply { addRoundRect(notesRect, cardRadius, cardRadius, Path.Direction.CW) }
+      canvas.save()
+      canvas.clipPath(notesClipPath)
+      canvas.drawRect(notesRect, whiteRowPaint)
+      canvas.drawRect(cardLeft, y, cardRight, y + notesBannerHeight, notesHeaderPaint)
+      canvas.save()
+      canvas.translate(cardLeft + 18f, y + 9f)
+      notesTitleLayout.draw(canvas)
+      canvas.restore()
+      var ny = y + notesBannerHeight + 10f
+      for (nl in notesLayouts) {
+        canvas.save()
+        canvas.translate(cardLeft + 18f, ny)
+        nl.draw(canvas)
+        canvas.restore()
+        ny += nl.height + 8f
+      }
+      canvas.restore()
+      canvas.drawRoundRect(notesRect, cardRadius, cardRadius, gridBorderPaint)
+    }
+
+    return bitmap
+  }
 
   private fun isBlackInk(pixel: Int): Boolean {
     val a = Color.alpha(pixel)
