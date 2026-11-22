@@ -7,6 +7,8 @@ import com.example.app.TailorApp
 import com.example.core.model.DeviceRegistrationStatus
 import com.example.core.model.ShopUserRole
 import com.example.core.preferences.AppLanguage
+import com.example.core.preferences.AutoCutterMode
+import com.example.core.preferences.PrinterCompatibilityMode
 import com.example.core.preferences.ShopPreferences
 import com.example.core.preferences.ShopPreferencesRepository
 import com.example.core.preferences.ThemeMode
@@ -44,6 +46,14 @@ class InMemoryShopPreferencesRepository(
   override suspend fun updatePaperWidth(paperWidthMm: Int) {
     val normalized = if (paperWidthMm == 80) 80 else 58
     state.update { it.copy(paperWidthMm = normalized) }
+  }
+
+  override suspend fun updateAutoCutterMode(mode: AutoCutterMode) {
+    state.update { it.copy(autoCutterMode = mode) }
+  }
+
+  override suspend fun updatePrinterCompatibilityMode(mode: PrinterCompatibilityMode) {
+    state.update { it.copy(printerCompatibilityMode = mode) }
   }
 
   override suspend fun updateThemeMode(themeMode: ThemeMode) {

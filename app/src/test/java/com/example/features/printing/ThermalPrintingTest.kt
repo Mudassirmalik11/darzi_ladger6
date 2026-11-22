@@ -30,6 +30,8 @@ import com.example.core.model.SleeveStyle
 import com.example.core.model.SnapshotJson
 import com.example.core.model.StyleSnapshot
 import com.example.core.preferences.AppLanguage
+import com.example.core.preferences.AutoCutterMode
+import com.example.core.preferences.PrinterCompatibilityMode
 import com.example.data.local.daos.OrderWithCustomer
 import com.example.data.local.entities.OrderEntity
 import com.example.data.local.entities.PaymentEntity
@@ -55,6 +57,7 @@ private class RecordingThermalPrinterClient(
   var shouldFailPrint: Boolean = false,
 ) : ThermalPrinterClient {
   val sentPayloads = mutableListOf<Pair<String, ByteArray>>()
+  val sentPacingModes = mutableListOf<PrinterPacingMode>()
 
   override fun isBluetoothSupported(): Boolean = true
   override fun isBluetoothEnabled(): Boolean = true
@@ -66,11 +69,19 @@ private class RecordingThermalPrinterClient(
 
   override fun discoverNearbyPrinters(): Flow<DiscoveredPrinter> = emptyFlow()
 
-  override suspend fun printBytes(printerAddress: String, bytes: ByteArray): Result<Unit> {
+  override suspend fun printBytes(printerAddress: String, bytes: ByteArray): Result<Unit> =
+    printBytes(printerAddress, bytes, PrinterPacingMode.FAST)
+
+  override suspend fun printBytes(
+    printerAddress: String,
+    bytes: ByteArray,
+    pacingMode: PrinterPacingMode,
+  ): Result<Unit> {
     if (shouldFailPrint) {
       return Result.failure(IllegalStateException("Printer offline"))
     }
     sentPayloads.add(printerAddress to bytes)
+    sentPacingModes.add(pacingMode)
     return Result.success(Unit)
   }
 }
@@ -544,6 +555,55 @@ class ThermalReceiptFormatterTest {
     assertTrue(escPosAscii.contains("0301-2823184"))
     assertFalse(escPosAscii.contains("?"))
   }
+
+  @Test
+  fun `auto cutter modes emit Function A GS V 0, GS V 1, or feed-only without GS V B`() {
+    val (detail, _) = sampleOrder(orderNumber = 1099)
+
+    val fullCut = ThermalReceiptFormatter.formatCustomerReceiptBytes(
+      shopName = "Al-Noor",
+      shopContact = "0300-1234567",
+      orderDetail = detail,
+      payments = emptyList(),
+      paperWidth = PaperWidth.MM_58,
+      language = AppLanguage.ENGLISH,
+      autoCutterMode = AutoCutterMode.FULL_CUT,
+    )
+    assertTrue(
+      fullCut.copyOfRange(fullCut.size - EscPosCommands.FEED_AND_CUT.size, fullCut.size)
+        .contentEquals(EscPosCommands.FEED_AND_CUT),
+    )
+    assertEquals(0x00.toByte(), fullCut.last())
+    assertEquals(0x56.toByte(), fullCut[fullCut.size - 2])
+
+    val partialCut = ThermalReceiptFormatter.formatCustomerReceiptBytes(
+      shopName = "Al-Noor",
+      shopContact = "0300-1234567",
+      orderDetail = detail,
+      payments = emptyList(),
+      paperWidth = PaperWidth.MM_58,
+      language = AppLanguage.ENGLISH,
+      autoCutterMode = AutoCutterMode.PARTIAL_CUT,
+    )
+    assertTrue(
+      partialCut.copyOfRange(partialCut.size - EscPosCommands.FEED_AND_PARTIAL_CUT.size, partialCut.size)
+        .contentEquals(EscPosCommands.FEED_AND_PARTIAL_CUT),
+    )
+
+    val cutterOff = ThermalReceiptFormatter.formatCustomerReceiptBytes(
+      shopName = "Al-Noor",
+      shopContact = "0300-1234567",
+      orderDetail = detail,
+      payments = emptyList(),
+      paperWidth = PaperWidth.MM_58,
+      language = AppLanguage.ENGLISH,
+      autoCutterMode = AutoCutterMode.OFF,
+    )
+    assertTrue(
+      cutterOff.copyOfRange(cutterOff.size - EscPosCommands.FEED_ONLY.size, cutterOff.size)
+        .contentEquals(EscPosCommands.FEED_ONLY),
+    )
+  }
 }
 
 @RunWith(RobolectricTestRunner::class)
@@ -955,5 +1015,52 @@ class BluetoothPrintingUiRobolectricTest {
       language = AppLanguage.URDU,
     )
     assertValidRasterBytes(testBytes80, 80)
+
+    // Verify legacy ESC * 33 compatibility mode emits 24-dot column-major bands + Partial Cut
+    val legacyBytes58 = ThermalReceiptFormatter.formatKarigarSlipBytes(
+      shopName = "درزی لیجر",
+      orderDetail = previewedOrderDetail,
+      measurement = measSnapshot,
+      style = styleSnapshot,
+      paperWidth = PaperWidth.MM_58,
+      language = AppLanguage.URDU,
+      autoCutterMode = AutoCutterMode.PARTIAL_CUT,
+      useLegacyBitImage = true,
+    )
+    assertEquals(EscPosCommands.INIT[0], legacyBytes58[0])
+    assertEquals(EscPosCommands.INIT[1], legacyBytes58[1])
+    // Bytes 5..7 should be LINE_SPACING_24_DOTS (1B 33 18), followed by ESC * 33 (1B 2A 21)
+    assertEquals(0x1B.toByte(), legacyBytes58[5])
+    assertEquals(0x33.toByte(), legacyBytes58[6])
+    assertEquals(0x18.toByte(), legacyBytes58[7])
+    assertEquals(0x1B.toByte(), legacyBytes58[8])
+    assertEquals(0x2A.toByte(), legacyBytes58[9])
+    assertEquals(0x21.toByte(), legacyBytes58[10])
+    val legacyTail = legacyBytes58.copyOfRange(
+      legacyBytes58.size - EscPosCommands.FEED_AND_PARTIAL_CUT.size,
+      legacyBytes58.size,
+    )
+    assertTrue(legacyTail.contentEquals(EscPosCommands.FEED_AND_PARTIAL_CUT))
+
+    // Verify ThermalPrintManager honors SAFE pacing and AutoCutterMode.OFF from preferences
+    runBlocking {
+      app.container.deviceSyncRepository.savePrinterConfig(
+        printerAddress = "00:11:22:33:44:55",
+        printerName = "RPP02N-58mm",
+        paperWidthMm = 58,
+      )
+      app.container.shopPreferencesRepository.updatePrinterCompatibilityMode(PrinterCompatibilityMode.COMPATIBLE_BITIMAGE)
+      app.container.shopPreferencesRepository.updateAutoCutterMode(AutoCutterMode.OFF)
+      recordingClient.sentPayloads.clear()
+      recordingClient.sentPacingModes.clear()
+      val result = app.container.thermalPrintManager.printTestPage()
+      assertTrue(result.isSuccess)
+      assertEquals(listOf(PrinterPacingMode.SAFE), recordingClient.sentPacingModes)
+      val sent = recordingClient.sentPayloads.single().second
+      assertTrue(
+        sent.copyOfRange(sent.size - EscPosCommands.FEED_ONLY.size, sent.size)
+          .contentEquals(EscPosCommands.FEED_ONLY),
+      )
+    }
   }
 }

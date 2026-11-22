@@ -22,6 +22,7 @@ import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.StyleSnapshot
 import com.example.core.preferences.AppLanguage
+import com.example.core.preferences.AutoCutterMode
 import com.example.core.ui.DateFormatUtils
 import com.example.core.ui.PkrFormatUtils
 import com.example.data.local.daos.OrderWithCustomer
@@ -81,6 +82,10 @@ data class ParchiSlipData(
 
 object EscPosCommands {
   val INIT: ByteArray = byteArrayOf(0x1B, 0x40)
+  val FONT_A: ByteArray = byteArrayOf(0x1B, 0x4D, 0x00)
+  val LINE_SPACING_DEFAULT: ByteArray = byteArrayOf(0x1B, 0x32)
+  val LINE_SPACING_24_DOTS: ByteArray = byteArrayOf(0x1B, 0x33, 0x18)
+  val CODEPAGE_CP437: ByteArray = byteArrayOf(0x1B, 0x74, 0x00)
   val ALIGN_LEFT: ByteArray = byteArrayOf(0x1B, 0x61, 0x00)
   val ALIGN_CENTER: ByteArray = byteArrayOf(0x1B, 0x61, 0x01)
   val ALIGN_RIGHT: ByteArray = byteArrayOf(0x1B, 0x61, 0x02)
@@ -89,7 +94,16 @@ object EscPosCommands {
   val TEXT_NORMAL: ByteArray = byteArrayOf(0x1D, 0x21, 0x00)
   val TEXT_DOUBLE_HEIGHT: ByteArray = byteArrayOf(0x1D, 0x21, 0x01)
   val TEXT_DOUBLE_SIZE: ByteArray = byteArrayOf(0x1D, 0x21, 0x11)
-  val FEED_AND_CUT: ByteArray = byteArrayOf(0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x42, 0x00)
+  // ESC d 5 + GS V 0 (Function A full cut) — avoids printing 'B'/garbage on printers lacking Function B
+  val FEED_AND_CUT: ByteArray = byteArrayOf(0x1B, 0x64, 0x05, 0x1D, 0x56, 0x00)
+  val FEED_AND_PARTIAL_CUT: ByteArray = byteArrayOf(0x1B, 0x64, 0x05, 0x1D, 0x56, 0x01)
+  val FEED_ONLY: ByteArray = byteArrayOf(0x1B, 0x64, 0x04)
+
+  fun cutCommand(mode: AutoCutterMode): ByteArray = when (mode) {
+    AutoCutterMode.FULL_CUT -> FEED_AND_CUT
+    AutoCutterMode.PARTIAL_CUT -> FEED_AND_PARTIAL_CUT
+    AutoCutterMode.OFF -> FEED_ONLY
+  }
 }
 
 object ThermalReceiptFormatter {
@@ -855,6 +869,8 @@ object ThermalReceiptFormatter {
     payments: List<PaymentEntity>,
     paperWidth: PaperWidth,
     language: AppLanguage = AppLanguage.ENGLISH,
+    autoCutterMode: AutoCutterMode = AutoCutterMode.FULL_CUT,
+    useLegacyBitImage: Boolean = false,
   ): ByteArray {
     if (language == AppLanguage.URDU) {
       val unicodeLines = formatCustomerReceiptLines(
@@ -870,6 +886,8 @@ object ThermalReceiptFormatter {
         lines = unicodeLines,
         paperWidth = paperWidth,
         isRtl = true,
+        autoCutterMode = autoCutterMode,
+        useLegacyBitImage = useLegacyBitImage,
       )?.let { return it }
     }
     return encodeEscPosDocument(
@@ -884,6 +902,7 @@ object ThermalReceiptFormatter {
         preserveUnicode = false,
         language = AppLanguage.ENGLISH,
       ),
+      autoCutterMode = autoCutterMode,
     )
   }
 
@@ -895,6 +914,8 @@ object ThermalReceiptFormatter {
     paperWidth: PaperWidth,
     language: AppLanguage = AppLanguage.ENGLISH,
     customerDisplayId: String? = null,
+    autoCutterMode: AutoCutterMode = AutoCutterMode.FULL_CUT,
+    useLegacyBitImage: Boolean = false,
   ): ByteArray {
     val parchiData = buildKarigarParchiData(
       shopName = shopName,
@@ -907,6 +928,8 @@ object ThermalReceiptFormatter {
     encodeParchiRasterDocument(
       data = parchiData,
       paperWidth = paperWidth,
+      autoCutterMode = autoCutterMode,
+      useLegacyBitImage = useLegacyBitImage,
     )?.let { return it }
 
     return encodeEscPosDocument(
@@ -922,6 +945,7 @@ object ThermalReceiptFormatter {
         language = AppLanguage.ENGLISH,
         customerDisplayId = customerDisplayId,
       ),
+      autoCutterMode = autoCutterMode,
     )
   }
 
@@ -936,6 +960,8 @@ object ThermalReceiptFormatter {
     recordedAtMillis: Long,
     paperWidth: PaperWidth,
     language: AppLanguage = AppLanguage.ENGLISH,
+    autoCutterMode: AutoCutterMode = AutoCutterMode.FULL_CUT,
+    useLegacyBitImage: Boolean = false,
   ): ByteArray {
     val parchiData = buildMeasurementParchiData(
       shopName = shopName,
@@ -951,6 +977,8 @@ object ThermalReceiptFormatter {
     encodeParchiRasterDocument(
       data = parchiData,
       paperWidth = paperWidth,
+      autoCutterMode = autoCutterMode,
+      useLegacyBitImage = useLegacyBitImage,
     )?.let { return it }
 
     return encodeEscPosDocument(
@@ -969,6 +997,7 @@ object ThermalReceiptFormatter {
         preserveUnicode = false,
         language = AppLanguage.ENGLISH,
       ),
+      autoCutterMode = autoCutterMode,
     )
   }
 
@@ -977,6 +1006,8 @@ object ThermalReceiptFormatter {
     printerName: String,
     paperWidth: PaperWidth,
     language: AppLanguage = AppLanguage.ENGLISH,
+    autoCutterMode: AutoCutterMode = AutoCutterMode.FULL_CUT,
+    useLegacyBitImage: Boolean = false,
   ): ByteArray {
     if (language == AppLanguage.URDU) {
       val unicodeLines = formatTestPageLines(
@@ -990,6 +1021,8 @@ object ThermalReceiptFormatter {
         lines = unicodeLines,
         paperWidth = paperWidth,
         isRtl = true,
+        autoCutterMode = autoCutterMode,
+        useLegacyBitImage = useLegacyBitImage,
       )?.let { return it }
     }
     return encodeEscPosDocument(
@@ -1002,12 +1035,15 @@ object ThermalReceiptFormatter {
         preserveUnicode = false,
         language = AppLanguage.ENGLISH,
       ),
+      autoCutterMode = autoCutterMode,
     )
   }
 
   private fun encodeParchiRasterDocument(
     data: ParchiSlipData,
     paperWidth: PaperWidth,
+    autoCutterMode: AutoCutterMode = AutoCutterMode.FULL_CUT,
+    useLegacyBitImage: Boolean = false,
   ): ByteArray? = runCatching {
     val widthPx = if (paperWidth == PaperWidth.MM_80) 576 else 384
     val pad = 10
@@ -1017,48 +1053,48 @@ object ThermalReceiptFormatter {
     val alignNormal = Layout.Alignment.ALIGN_NORMAL
 
     val bannerPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-      color = Color.WHITE
-      textSize = if (paperWidth == PaperWidth.MM_80) 32f else 26f
+      color = Color.BLACK
+      textSize = if (paperWidth == PaperWidth.MM_80) 34f else 26f
       typeface = Typeface.DEFAULT_BOLD
     }
     val infoBoldPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.BLACK
-      textSize = if (paperWidth == PaperWidth.MM_80) 27f else 23f
+      textSize = if (paperWidth == PaperWidth.MM_80) 29f else 25f
       typeface = Typeface.DEFAULT_BOLD
     }
     val infoBodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.BLACK
-      textSize = if (paperWidth == PaperWidth.MM_80) 25f else 21f
-      typeface = Typeface.DEFAULT
+      textSize = if (paperWidth == PaperWidth.MM_80) 27f else 23f
+      typeface = Typeface.DEFAULT_BOLD
     }
     val shopPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.BLACK
-      textSize = if (paperWidth == PaperWidth.MM_80) 26f else 22f
+      textSize = if (paperWidth == PaperWidth.MM_80) 28f else 23f
       typeface = Typeface.DEFAULT_BOLD
     }
     val datePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.BLACK
-      textSize = if (paperWidth == PaperWidth.MM_80) 22f else 19f
+      textSize = if (paperWidth == PaperWidth.MM_80) 24f else 20f
       typeface = Typeface.DEFAULT_BOLD
     }
     val cellLabelPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.BLACK
-      textSize = if (paperWidth == PaperWidth.MM_80) 24f else 20f
+      textSize = if (paperWidth == PaperWidth.MM_80) 26f else 22f
       typeface = Typeface.DEFAULT_BOLD
     }
     val cellValuePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.BLACK
-      textSize = if (paperWidth == PaperWidth.MM_80) 40f else 32f
+      textSize = if (paperWidth == PaperWidth.MM_80) 42f else 34f
       typeface = Typeface.DEFAULT_BOLD
     }
     val notesTitlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.BLACK
-      textSize = if (paperWidth == PaperWidth.MM_80) 28f else 24f
+      textSize = if (paperWidth == PaperWidth.MM_80) 30f else 25f
       typeface = Typeface.DEFAULT_BOLD
     }
     val notesBodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.BLACK
-      textSize = if (paperWidth == PaperWidth.MM_80) 25f else 21f
+      textSize = if (paperWidth == PaperWidth.MM_80) 27f else 23f
       typeface = Typeface.DEFAULT_BOLD
     }
 
@@ -1071,7 +1107,7 @@ object ThermalReceiptFormatter {
     ): StaticLayout = StaticLayout.Builder.obtain(text, 0, text.length, paint, maxWidth.coerceAtLeast(32))
       .setAlignment(alignment)
       .setTextDirection(textDirectionHeuristic)
-      .setLineSpacing(4f, 1.0f)
+      .setLineSpacing(5f, 1.0f)
       .setIncludePad(true)
       .build()
 
@@ -1111,7 +1147,7 @@ object ThermalReceiptFormatter {
     val infoCardHeight = bannerHeight + infoBodyHeight
 
     // 2. Shop + Garment + Date Row
-    val dateWidth = (contentWidth * 0.34f).toInt()
+    val dateWidth = (contentWidth * 0.38f).toInt()
     val shopWidth = contentWidth - dateWidth - 8
     val shopLayout = makeLayout(data.headerBannerText, shopPaint, shopWidth)
     val dateLayout = makeLayout(data.dateText, datePaint, dateWidth, Layout.Alignment.ALIGN_OPPOSITE)
@@ -1186,20 +1222,19 @@ object ThermalReceiptFormatter {
     try {
       val canvas = Canvas(bitmap)
       canvas.drawColor(Color.WHITE)
-      val blackFill = Paint().apply { color = Color.BLACK; style = Paint.Style.FILL }
-      val borderStroke = Paint().apply { color = Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 2.5f }
-      val gridStroke = Paint().apply { color = Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 1.5f }
+      val blackFill = Paint().apply { color = Color.BLACK; style = Paint.Style.FILL; isAntiAlias = false }
+      val borderStroke = Paint().apply { color = Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 3f; isAntiAlias = false }
+      val gridStroke = Paint().apply { color = Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 2f; isAntiAlias = false }
 
       var y = 10f
 
-      // Draw Highlighted Customer Info Box
-      canvas.drawRect(pad.toFloat(), y, (widthPx - pad).toFloat(), y + bannerHeight, blackFill)
+      // Draw Crisp Framed Customer Info Header (white background avoids thermal head heat-bleed & slowdown)
+      canvas.drawRect(pad.toFloat(), y, (widthPx - pad).toFloat(), y + infoCardHeight, borderStroke)
       canvas.save()
       canvas.translate((pad + 10).toFloat(), y + 8f)
       bannerLayout.draw(canvas)
       canvas.restore()
-
-      canvas.drawRect(pad.toFloat(), y, (widthPx - pad).toFloat(), y + infoCardHeight, borderStroke)
+      canvas.drawRect(pad.toFloat(), y + bannerHeight - 3f, (widthPx - pad).toFloat(), y + bannerHeight, blackFill)
       var iy = y + bannerHeight + 8f
       for (infoLayout in infoLines) {
         canvas.save()
@@ -1280,55 +1315,120 @@ object ThermalReceiptFormatter {
         }
       }
 
-      bitmapToEscPosRaster(bitmap)
+      bitmapToEscPosRaster(
+        bitmap = bitmap,
+        autoCutterMode = autoCutterMode,
+        useLegacyBitImage = useLegacyBitImage,
+      )
     } finally {
       bitmap.recycle()
     }
   }.getOrNull()
 
-  private fun bitmapToEscPosRaster(bitmap: Bitmap): ByteArray {
+  private fun isBlackInk(pixel: Int): Boolean {
+    val a = Color.alpha(pixel)
+    if (a <= 128) return false
+    val r = Color.red(pixel)
+    val g = Color.green(pixel)
+    val b = Color.blue(pixel)
+    val luma = (r * 30 + g * 59 + b * 11) / 100
+    // Strict < 128 threshold keeps bold strokes crisp without bloating anti-aliased gray halos
+    return luma < 128
+  }
+
+  private fun bitmapToEscPosRaster(
+    bitmap: Bitmap,
+    autoCutterMode: AutoCutterMode = AutoCutterMode.FULL_CUT,
+    useLegacyBitImage: Boolean = false,
+  ): ByteArray {
     val widthPx = bitmap.width
     val totalHeight = bitmap.height
+    val allPixels = IntArray(widthPx * totalHeight)
+    bitmap.getPixels(allPixels, 0, widthPx, 0, 0, widthPx, totalHeight)
+
+    // Trim trailing blank paper rows so we don't transmit wasted white bitmap bytes
+    var lastInkRow = -1
+    var row = totalHeight - 1
+    while (row >= 0 && lastInkRow < 0) {
+      val rowOffset = row * widthPx
+      for (x in 0 until widthPx) {
+        if (isBlackInk(allPixels[rowOffset + x])) {
+          lastInkRow = row
+          break
+        }
+      }
+      row--
+    }
+    val effectiveHeight = if (lastInkRow >= 0) {
+      (lastInkRow + 5).coerceAtMost(totalHeight)
+    } else {
+      totalHeight.coerceAtMost(24)
+    }
+
     val out = ByteArrayOutputStream()
     out.write(EscPosCommands.INIT)
     out.write(EscPosCommands.ALIGN_LEFT)
-    val bytesPerRow = widthPx / 8
-    val xL = (bytesPerRow and 0xFF).toByte()
-    val xH = ((bytesPerRow shr 8) and 0xFF).toByte()
-    // Small 24-dot bands (<1.8 KB per GS v 0 command) prevent printer FIFO overflow & coding garbage
-    val maxSliceHeight = 24
-    var startY = 0
-    val pixels = IntArray(widthPx)
 
-    while (startY < totalHeight) {
-      val sliceHeight = (totalHeight - startY).coerceAtMost(maxSliceHeight)
-      val yL = (sliceHeight and 0xFF).toByte()
-      val yH = ((sliceHeight shr 8) and 0xFF).toByte()
-      out.write(byteArrayOf(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH))
-
-      for (rowOffset in 0 until sliceHeight) {
-        bitmap.getPixels(pixels, 0, widthPx, 0, startY + rowOffset, widthPx, 1)
-        for (byteIdx in 0 until bytesPerRow) {
-          var packed = 0
-          val baseX = byteIdx * 8
-          for (bit in 0 until 8) {
-            val pixel = pixels[baseX + bit]
-            val a = Color.alpha(pixel)
-            val r = Color.red(pixel)
-            val g = Color.green(pixel)
-            val b = Color.blue(pixel)
-            val luma = (r * 30 + g * 59 + b * 11) / 100
-            if (a > 128 && luma < 175) {
-              packed = packed or (1 shl (7 - bit))
+    if (useLegacyBitImage) {
+      // Universal ESC * 33 (24-dot double-density bit-image) mode for printers that glitch on GS v 0
+      out.write(EscPosCommands.LINE_SPACING_24_DOTS)
+      val nL = (widthPx and 0xFF).toByte()
+      val nH = ((widthPx shr 8) and 0xFF).toByte()
+      val bandBuf = ByteArray(widthPx * 3)
+      var startY = 0
+      while (startY < effectiveHeight) {
+        out.write(byteArrayOf(0x1B, 0x2A, 0x21, nL, nH))
+        for (x in 0 until widthPx) {
+          for (byteGroup in 0 until 3) {
+            var packed = 0
+            for (bit in 0 until 8) {
+              val py = startY + byteGroup * 8 + bit
+              if (py < effectiveHeight && isBlackInk(allPixels[py * widthPx + x])) {
+                packed = packed or (1 shl (7 - bit))
+              }
             }
+            bandBuf[x * 3 + byteGroup] = packed.toByte()
           }
-          out.write(packed)
         }
+        out.write(bandBuf)
+        out.write(0x0A)
+        startY += 24
       }
-      startY += sliceHeight
+      out.write(EscPosCommands.LINE_SPACING_DEFAULT)
+    } else {
+      val bytesPerRow = widthPx / 8
+      val xL = (bytesPerRow and 0xFF).toByte()
+      val xH = ((bytesPerRow shr 8) and 0xFF).toByte()
+      // 24-dot GS v 0 bands keep per-command size small (~1.7 KB) to prevent printer buffer overflow
+      val maxSliceHeight = 24
+      var startY = 0
+      while (startY < effectiveHeight) {
+        val sliceHeight = (effectiveHeight - startY).coerceAtMost(maxSliceHeight)
+        val yL = (sliceHeight and 0xFF).toByte()
+        val yH = ((sliceHeight shr 8) and 0xFF).toByte()
+        out.write(byteArrayOf(0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH))
+
+        val bandBuf = ByteArray(sliceHeight * bytesPerRow)
+        for (rowOffset in 0 until sliceHeight) {
+          val pixelRowStart = (startY + rowOffset) * widthPx
+          val bufRowStart = rowOffset * bytesPerRow
+          for (byteIdx in 0 until bytesPerRow) {
+            var packed = 0
+            val baseX = pixelRowStart + byteIdx * 8
+            for (bit in 0 until 8) {
+              if (isBlackInk(allPixels[baseX + bit])) {
+                packed = packed or (1 shl (7 - bit))
+              }
+            }
+            bandBuf[bufRowStart + byteIdx] = packed.toByte()
+          }
+        }
+        out.write(bandBuf)
+        startY += sliceHeight
+      }
     }
 
-    out.write(EscPosCommands.FEED_AND_CUT)
+    out.write(EscPosCommands.cutCommand(autoCutterMode))
     return out.toByteArray()
   }
 
@@ -1336,23 +1436,25 @@ object ThermalReceiptFormatter {
     lines: List<String>,
     paperWidth: PaperWidth,
     isRtl: Boolean,
+    autoCutterMode: AutoCutterMode = AutoCutterMode.FULL_CUT,
+    useLegacyBitImage: Boolean = false,
   ): ByteArray? = runCatching {
     val widthPx = if (paperWidth == PaperWidth.MM_80) 576 else 384
     val horizontalPad = 10
     val contentWidth = widthPx - horizontalPad * 2
     val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.BLACK
-      textSize = if (paperWidth == PaperWidth.MM_80) 27f else 24f
-      typeface = Typeface.DEFAULT
+      textSize = if (paperWidth == PaperWidth.MM_80) 29f else 25f
+      typeface = Typeface.DEFAULT_BOLD
     }
     val boldPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       color = Color.BLACK
-      textSize = if (paperWidth == PaperWidth.MM_80) 29f else 26f
+      textSize = if (paperWidth == PaperWidth.MM_80) 32f else 27f
       typeface = Typeface.DEFAULT_BOLD
     }
     val bannerPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-      color = Color.WHITE
-      textSize = if (paperWidth == PaperWidth.MM_80) 34f else 30f
+      color = Color.BLACK
+      textSize = if (paperWidth == PaperWidth.MM_80) 34f else 28f
       typeface = Typeface.DEFAULT_BOLD
     }
     val direction = if (isRtl) TextDirectionHeuristics.RTL else TextDirectionHeuristics.LTR
@@ -1375,7 +1477,7 @@ object ThermalReceiptFormatter {
         val layout = StaticLayout.Builder.obtain(trimmed, 0, trimmed.length, bannerPaint, contentWidth - 16)
           .setAlignment(Layout.Alignment.ALIGN_CENTER)
           .setTextDirection(direction)
-          .setLineSpacing(4f, 1.0f)
+          .setLineSpacing(5f, 1.0f)
           .setIncludePad(true)
           .build()
         rows.add(HighlightBannerRow(layout))
@@ -1416,18 +1518,19 @@ object ThermalReceiptFormatter {
     try {
       val canvas = Canvas(bitmap)
       canvas.drawColor(Color.WHITE)
-      val linePaint = Paint().apply { color = Color.BLACK }
+      val linePaint = Paint().apply { color = Color.BLACK; isAntiAlias = false }
+      val bannerStroke = Paint().apply { color = Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 3f; isAntiAlias = false }
       var y = 8f
       for (row in rows) {
         when (row) {
           is DividerRow -> {
-            val stroke = if (row.heavy) 3f else 1.5f
+            val stroke = if (row.heavy) 3f else 2f
             canvas.drawRect(horizontalPad.toFloat(), y + 4f, (widthPx - horizontalPad).toFloat(), y + 4f + stroke, linePaint)
             y += if (row.heavy) 14f else 10f
           }
           is HighlightBannerRow -> {
             val bannerHeight = row.layout.height + 16f
-            canvas.drawRect(horizontalPad.toFloat(), y, (widthPx - horizontalPad).toFloat(), y + bannerHeight, linePaint)
+            canvas.drawRect(horizontalPad.toFloat(), y, (widthPx - horizontalPad).toFloat(), y + bannerHeight, bannerStroke)
             canvas.save()
             canvas.translate((horizontalPad + 8).toFloat(), y + 8f)
             row.layout.draw(canvas)
@@ -1445,7 +1548,11 @@ object ThermalReceiptFormatter {
         }
       }
 
-      bitmapToEscPosRaster(bitmap)
+      bitmapToEscPosRaster(
+        bitmap = bitmap,
+        autoCutterMode = autoCutterMode,
+        useLegacyBitImage = useLegacyBitImage,
+      )
     } finally {
       bitmap.recycle()
     }
@@ -1455,9 +1562,13 @@ object ThermalReceiptFormatter {
     headerTitle: String,
     highlightLine: String,
     bodyLines: List<String>,
+    autoCutterMode: AutoCutterMode = AutoCutterMode.FULL_CUT,
   ): ByteArray {
     val out = ByteArrayOutputStream()
     out.write(EscPosCommands.INIT)
+    out.write(EscPosCommands.FONT_A)
+    out.write(EscPosCommands.LINE_SPACING_DEFAULT)
+    out.write(EscPosCommands.CODEPAGE_CP437)
 
     out.write(EscPosCommands.ALIGN_CENTER)
     out.write(EscPosCommands.BOLD_ON)
@@ -1475,6 +1586,8 @@ object ThermalReceiptFormatter {
         trimmed.startsWith("Order ID:") ||
         trimmed.startsWith("Customer ID:") ||
         trimmed.startsWith("Name:") ||
+        trimmed.startsWith("Total:") ||
+        trimmed.startsWith("REMAINING:") ||
         trimmed == "MEASUREMENTS (Inches)" ||
         trimmed == "STITCHING STYLES" ||
         trimmed == "ADDITIONAL NOTES"
@@ -1493,7 +1606,7 @@ object ThermalReceiptFormatter {
       }
     }
 
-    out.write(EscPosCommands.FEED_AND_CUT)
+    out.write(EscPosCommands.cutCommand(autoCutterMode))
     return out.toByteArray()
   }
 

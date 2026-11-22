@@ -51,6 +51,14 @@
     <string name="settings_paper_width_label">Receipt Paper Width</string>
     <string name="settings_paper_58mm">58 mm</string>
     <string name="settings_paper_80mm">80 mm</string>
+    <string name="settings_auto_cutter_label">Auto-Cutter</string>
+    <string name="settings_auto_cutter_full">Full Cut</string>
+    <string name="settings_auto_cutter_partial">Partial Cut</string>
+    <string name="settings_auto_cutter_off">Off</string>
+    <string name="settings_print_mode_label">Printer Print Mode</string>
+    <string name="settings_print_mode_fast">Fast</string>
+    <string name="settings_print_mode_compatible">Compatible</string>
+    <string name="settings_print_mode_hint">Switch to Compatible if a printer outputs coded text or garbled symbols.</string>
     <string name="settings_appearance_section">Appearance</string>
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>

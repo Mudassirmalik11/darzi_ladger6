@@ -3,6 +3,7 @@ package com.example.features.printing
 import com.example.core.model.ShopUserRole
 import com.example.core.model.SnapshotJson
 import com.example.core.preferences.AppLanguage
+import com.example.core.preferences.PrinterCompatibilityMode
 import com.example.core.preferences.ShopPreferences
 import com.example.core.preferences.ShopPreferencesRepository
 import com.example.data.local.daos.OrderWithCustomer
@@ -62,6 +63,16 @@ class ThermalPrintManager(
 
   private fun textFor(language: AppLanguage, english: String, urdu: String): String =
     if (language == AppLanguage.URDU) urdu else english
+
+  private fun useLegacyBitImageFor(prefs: ShopPreferences): Boolean =
+    prefs.printerCompatibilityMode == PrinterCompatibilityMode.COMPATIBLE_BITIMAGE
+
+  private fun pacingModeFor(prefs: ShopPreferences): PrinterPacingMode =
+    if (prefs.printerCompatibilityMode == PrinterCompatibilityMode.COMPATIBLE_BITIMAGE) {
+      PrinterPacingMode.SAFE
+    } else {
+      PrinterPacingMode.FAST
+    }
 
   suspend fun buildPreviewText(
     orderDetail: OrderWithCustomer,
@@ -289,8 +300,10 @@ class ThermalPrintManager(
       payments = payments,
       paperWidth = width,
       language = prefs.language,
+      autoCutterMode = prefs.autoCutterMode,
+      useLegacyBitImage = useLegacyBitImageFor(prefs),
     )
-    return printerClient.printBytes(printer.printerAddress, bytes).map {
+    return printerClient.printBytes(printer.printerAddress, bytes, pacingModeFor(prefs)).map {
       textFor(
         prefs.language,
         "Customer receipt sent to ${printer.printerName}",
@@ -351,8 +364,10 @@ class ThermalPrintManager(
       paperWidth = width,
       language = prefs.language,
       customerDisplayId = customerDisplayId,
+      autoCutterMode = prefs.autoCutterMode,
+      useLegacyBitImage = useLegacyBitImageFor(prefs),
     )
-    return printerClient.printBytes(printer.printerAddress, bytes).map {
+    return printerClient.printBytes(printer.printerAddress, bytes, pacingModeFor(prefs)).map {
       textFor(
         prefs.language,
         "Karigar workshop slip sent to ${printer.printerName}",
@@ -392,8 +407,10 @@ class ThermalPrintManager(
       recordedAtMillis = measurement.createdAt,
       paperWidth = width,
       language = prefs.language,
+      autoCutterMode = prefs.autoCutterMode,
+      useLegacyBitImage = useLegacyBitImageFor(prefs),
     )
-    return printerClient.printBytes(printer.printerAddress, bytes).map {
+    return printerClient.printBytes(printer.printerAddress, bytes, pacingModeFor(prefs)).map {
       textFor(
         prefs.language,
         "Measurement slip sent to ${printer.printerName}",
@@ -423,8 +440,10 @@ class ThermalPrintManager(
       printerName = printer.printerName,
       paperWidth = width,
       language = prefs.language,
+      autoCutterMode = prefs.autoCutterMode,
+      useLegacyBitImage = useLegacyBitImageFor(prefs),
     )
-    return printerClient.printBytes(printer.printerAddress, bytes).map {
+    return printerClient.printBytes(printer.printerAddress, bytes, pacingModeFor(prefs)).map {
       textFor(
         prefs.language,
         "Test slip sent to ${printer.printerName}",

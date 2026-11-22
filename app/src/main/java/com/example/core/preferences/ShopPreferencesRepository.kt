@@ -25,10 +25,23 @@ enum class AppLanguage(val code: String) {
   URDU("ur"),
 }
 
+enum class AutoCutterMode {
+  FULL_CUT,
+  PARTIAL_CUT,
+  OFF,
+}
+
+enum class PrinterCompatibilityMode {
+  FAST_RASTER,
+  COMPATIBLE_BITIMAGE,
+}
+
 data class ShopPreferences(
   val shopName: String = "Darzi Ledger",
   val shopContact: String = "",
   val paperWidthMm: Int = 58,
+  val autoCutterMode: AutoCutterMode = AutoCutterMode.FULL_CUT,
+  val printerCompatibilityMode: PrinterCompatibilityMode = PrinterCompatibilityMode.FAST_RASTER,
   val themeMode: ThemeMode = ThemeMode.SYSTEM,
   val language: AppLanguage = AppLanguage.URDU,
 )
@@ -39,6 +52,10 @@ interface ShopPreferencesRepository {
   suspend fun updateShopProfile(shopName: String, shopContact: String)
 
   suspend fun updatePaperWidth(paperWidthMm: Int)
+
+  suspend fun updateAutoCutterMode(mode: AutoCutterMode) {}
+
+  suspend fun updatePrinterCompatibilityMode(mode: PrinterCompatibilityMode) {}
 
   suspend fun updateThemeMode(themeMode: ThemeMode)
 
@@ -53,6 +70,8 @@ class DataStoreShopPreferencesRepository(
     val SHOP_NAME = stringPreferencesKey("shop_name")
     val SHOP_CONTACT = stringPreferencesKey("shop_contact")
     val PAPER_WIDTH_MM = intPreferencesKey("paper_width_mm")
+    val AUTO_CUTTER_MODE = stringPreferencesKey("auto_cutter_mode")
+    val PRINTER_COMPATIBILITY_MODE = stringPreferencesKey("printer_compatibility_mode")
     val THEME_MODE = stringPreferencesKey("theme_mode")
     val LANGUAGE = stringPreferencesKey("app_language")
   }
@@ -67,10 +86,19 @@ class DataStoreShopPreferencesRepository(
         AppLanguage.entries.firstOrNull { it.name == savedLanguage || it.code == savedLanguage }
           ?: AppLanguage.URDU
       val paperWidth = prefs[Keys.PAPER_WIDTH_MM]?.takeIf { it == 58 || it == 80 } ?: 58
+      val autoCutterMode =
+        AutoCutterMode.entries.firstOrNull { it.name == prefs[Keys.AUTO_CUTTER_MODE] }
+          ?: AutoCutterMode.FULL_CUT
+      val compatibilityMode =
+        PrinterCompatibilityMode.entries.firstOrNull {
+          it.name == prefs[Keys.PRINTER_COMPATIBILITY_MODE]
+        } ?: PrinterCompatibilityMode.FAST_RASTER
       ShopPreferences(
         shopName = prefs[Keys.SHOP_NAME]?.takeIf { it.isNotBlank() } ?: "Darzi Ledger",
         shopContact = prefs[Keys.SHOP_CONTACT] ?: "",
         paperWidthMm = paperWidth,
+        autoCutterMode = autoCutterMode,
+        printerCompatibilityMode = compatibilityMode,
         themeMode = themeMode,
         language = language,
       )
@@ -89,6 +117,18 @@ class DataStoreShopPreferencesRepository(
     val normalized = if (paperWidthMm == 80) 80 else 58
     context.shopPrefsDataStore.edit { prefs ->
       prefs[Keys.PAPER_WIDTH_MM] = normalized
+    }
+  }
+
+  override suspend fun updateAutoCutterMode(mode: AutoCutterMode) {
+    context.shopPrefsDataStore.edit { prefs ->
+      prefs[Keys.AUTO_CUTTER_MODE] = mode.name
+    }
+  }
+
+  override suspend fun updatePrinterCompatibilityMode(mode: PrinterCompatibilityMode) {
+    context.shopPrefsDataStore.edit { prefs ->
+      prefs[Keys.PRINTER_COMPATIBILITY_MODE] = mode.name
     }
   }
 

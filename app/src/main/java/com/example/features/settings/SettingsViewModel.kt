@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.core.model.ShopUserRole
 import com.example.core.preferences.AppLanguage
+import com.example.core.preferences.AutoCutterMode
+import com.example.core.preferences.PrinterCompatibilityMode
 import com.example.core.preferences.ShopPreferences
 import com.example.core.preferences.ShopPreferencesRepository
 import com.example.core.preferences.ThemeMode
@@ -416,6 +418,11 @@ class SettingsViewModel(
 
   fun hasBluetoothConnectPermission(): Boolean = thermalPrinterClient.hasConnectPermission()
 
+  fun hasBluetoothScanPermission(): Boolean = thermalPrinterClient.hasScanPermission()
+
+  fun hasAllBluetoothPermissions(): Boolean =
+    hasBluetoothConnectPermission() && hasBluetoothScanPermission()
+
   fun loadPairedPrinters() {
     viewModelScope.launch {
       _printerError.value = null
@@ -432,6 +439,13 @@ class SettingsViewModel(
   fun startNearbyScan() {
     scanJob?.cancel()
     _printerError.value = null
+    if (!hasAllBluetoothPermissions()) {
+      _printerError.value = localizedText(
+        "Bluetooth scan permission is required to find nearby printers.",
+        "قریبی پرنٹرز تلاش کرنے کے لیے بلوٹوتھ اسکین اجازت درکار ہے۔",
+      )
+      return
+    }
     if (!thermalPrinterClient.isBluetoothEnabled()) {
       _printerError.value = localizedText(
         "Bluetooth is turned off. Please enable Bluetooth.",
@@ -532,6 +546,18 @@ class SettingsViewModel(
           connectionSettingsJson = existing.connectionSettingsJson,
         )
       }
+    }
+  }
+
+  fun setAutoCutterMode(mode: AutoCutterMode) {
+    viewModelScope.launch {
+      repository.updateAutoCutterMode(mode)
+    }
+  }
+
+  fun setPrinterCompatibilityMode(mode: PrinterCompatibilityMode) {
+    viewModelScope.launch {
+      repository.updatePrinterCompatibilityMode(mode)
     }
   }
 

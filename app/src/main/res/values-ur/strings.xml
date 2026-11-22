@@ -51,6 +51,14 @@
     <string name="settings_paper_width_label">رسید کا سائز</string>
     <string name="settings_paper_58mm">58 ملی میٹر</string>
     <string name="settings_paper_80mm">80 ملی میٹر</string>
+    <string name="settings_auto_cutter_label">آٹو کٹر</string>
+    <string name="settings_auto_cutter_full">مکمل کٹ</string>
+    <string name="settings_auto_cutter_partial">جزوی کٹ</string>
+    <string name="settings_auto_cutter_off">بند</string>
+    <string name="settings_print_mode_label">پرنٹ موڈ</string>
+    <string name="settings_print_mode_fast">تیز (Fast)</string>
+    <string name="settings_print_mode_compatible">ہم آہنگ (Compatible)</string>
+    <string name="settings_print_mode_hint">اگر کسی پرنٹر پر کوڈنگ یا خراب حروف آئیں تو ہم آہنگ موڈ منتخب کریں۔</string>
     <string name="settings_appearance_section">ظاہری شکل اور زبان</string>
     <string name="settings_theme_system">سسٹم</string>
     <string name="settings_theme_light">روشن</string>

@@ -674,13 +674,23 @@ fun OrderDetailContent(
                   .heightIn(min = 48.dp)
                   .testTag("order_print_customer_button"),
               ) {
-                Icon(
-                  imageVector = Icons.Filled.Print,
-                  contentDescription = null,
-                  modifier = Modifier
-                    .padding(end = 6.dp)
-                    .size(18.dp),
-                )
+                if (isPrinting) {
+                  androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier
+                      .padding(end = 6.dp)
+                      .size(16.dp),
+                    color = OnAtelierOlive,
+                    strokeWidth = 2.dp,
+                  )
+                } else {
+                  Icon(
+                    imageVector = Icons.Filled.Print,
+                    contentDescription = null,
+                    modifier = Modifier
+                      .padding(end = 6.dp)
+                      .size(18.dp),
+                  )
+                }
                 Text(stringResource(R.string.order_print_customer))
               }
 
@@ -691,13 +701,22 @@ fun OrderDetailContent(
                   .heightIn(min = 48.dp)
                   .testTag("order_print_karigar_button"),
               ) {
-                Icon(
-                  imageVector = Icons.Filled.Print,
-                  contentDescription = null,
-                  modifier = Modifier
-                    .padding(end = 6.dp)
-                    .size(18.dp),
-                )
+                if (isPrinting) {
+                  androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier
+                      .padding(end = 6.dp)
+                      .size(16.dp),
+                    strokeWidth = 2.dp,
+                  )
+                } else {
+                  Icon(
+                    imageVector = Icons.Filled.Print,
+                    contentDescription = null,
+                    modifier = Modifier
+                      .padding(end = 6.dp)
+                      .size(18.dp),
+                  )
+                }
                 Text(stringResource(R.string.order_print_karigar))
               }
             }

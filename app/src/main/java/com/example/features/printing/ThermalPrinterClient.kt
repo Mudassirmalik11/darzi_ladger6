@@ -20,7 +20,14 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+
+enum class PrinterPacingMode {
+  FAST,
+  SAFE,
+}
 
 data class DiscoveredPrinter(
   val name: String,
@@ -36,6 +43,11 @@ interface ThermalPrinterClient {
   suspend fun getPairedPrinters(): Result<List<DiscoveredPrinter>>
   fun discoverNearbyPrinters(): Flow<DiscoveredPrinter>
   suspend fun printBytes(printerAddress: String, bytes: ByteArray): Result<Unit>
+  suspend fun printBytes(
+    printerAddress: String,
+    bytes: ByteArray,
+    pacingMode: PrinterPacingMode,
+  ): Result<Unit> = printBytes(printerAddress, bytes)
 }
 
 class AndroidBluetoothPrinterClient(
@@ -43,6 +55,7 @@ class AndroidBluetoothPrinterClient(
 ) : ThermalPrinterClient {
 
   private val appContext = context.applicationContext
+  private val printMutex = Mutex()
   private val bluetoothAdapter: BluetoothAdapter? by lazy {
     val manager = appContext.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     manager?.adapter
@@ -143,57 +156,76 @@ class AndroidBluetoothPrinterClient(
     }
   }
 
+  override suspend fun printBytes(
+    printerAddress: String,
+    bytes: ByteArray,
+  ): Result<Unit> = printBytes(printerAddress, bytes, PrinterPacingMode.FAST)
+
   @SuppressLint("MissingPermission")
   override suspend fun printBytes(
     printerAddress: String,
     bytes: ByteArray,
-  ): Result<Unit> = withContext(Dispatchers.IO) {
-    val adapter = bluetoothAdapter
-      ?: return@withContext Result.failure(IllegalStateException("Bluetooth hardware is not available on this device."))
-    if (!hasConnectPermission()) {
-      return@withContext Result.failure(SecurityException("Bluetooth permission is required to print."))
-    }
-    if (!adapter.isEnabled) {
-      return@withContext Result.failure(IllegalStateException("Bluetooth is turned off. Turn on Bluetooth and retry."))
-    }
-    if (printerAddress.isBlank()) {
-      return@withContext Result.failure(IllegalArgumentException("No Bluetooth printer address configured."))
-    }
+    pacingMode: PrinterPacingMode,
+  ): Result<Unit> = printMutex.withLock {
+    withContext(Dispatchers.IO) {
+      val adapter = bluetoothAdapter
+        ?: return@withContext Result.failure(IllegalStateException("Bluetooth hardware is not available on this device."))
+      if (!hasConnectPermission()) {
+        return@withContext Result.failure(SecurityException("Bluetooth permission is required to print."))
+      }
+      if (!adapter.isEnabled) {
+        return@withContext Result.failure(IllegalStateException("Bluetooth is turned off. Turn on Bluetooth and retry."))
+      }
+      if (printerAddress.isBlank()) {
+        return@withContext Result.failure(IllegalArgumentException("No Bluetooth printer address configured."))
+      }
 
-    var socket: BluetoothSocket? = null
-    try {
-      if (hasScanPermission() && adapter.isDiscovering) {
-        adapter.cancelDiscovery()
-      }
-      val device = adapter.getRemoteDevice(printerAddress)
-      socket = connectRfcommSocket(device)
-      val out = socket.outputStream
-      val isLargeRasterPayload = bytes.size > 512
-      val chunkSize = if (isLargeRasterPayload) 256 else 512
-      var offset = 0
-      while (offset < bytes.size) {
-        val len = (bytes.size - offset).coerceAtMost(chunkSize)
-        out.write(bytes, offset, len)
-        offset += len
-        if (isLargeRasterPayload && offset < bytes.size) {
-          out.flush()
-          delay(22L)
+      var socket: BluetoothSocket? = null
+      try {
+        if (hasScanPermission() && adapter.isDiscovering) {
+          adapter.cancelDiscovery()
         }
+        val device = adapter.getRemoteDevice(printerAddress)
+        socket = connectRfcommSocket(device)
+        val out = socket.outputStream
+        val chunkSize = when (pacingMode) {
+          PrinterPacingMode.FAST -> 2048
+          PrinterPacingMode.SAFE -> 512
+        }
+        val interChunkDelayMs = when (pacingMode) {
+          PrinterPacingMode.FAST -> 3L
+          PrinterPacingMode.SAFE -> 12L
+        }
+        var offset = 0
+        while (offset < bytes.size) {
+          val len = (bytes.size - offset).coerceAtMost(chunkSize)
+          out.write(bytes, offset, len)
+          offset += len
+          if (offset < bytes.size && bytes.size > chunkSize) {
+            delay(interChunkDelayMs)
+          }
+        }
+        out.flush()
+        // Wait proportionally for the RFCOMM radio buffer to drain so the printer never
+        // receives a truncated GS v 0 band (which causes raw binary bytes to print as text).
+        val drainDelayMs = when {
+          bytes.size <= 1024 -> 300L
+          pacingMode == PrinterPacingMode.SAFE -> (bytes.size / 22L).coerceIn(1000L, 2800L)
+          else -> (bytes.size / 42L).coerceIn(850L, 1800L)
+        }
+        delay(drainDelayMs)
+        Result.success(Unit)
+      } catch (e: IOException) {
+        Result.failure(
+          IOException("Could not reach thermal printer ($printerAddress). Check that it is powered on and paired.", e),
+        )
+      } catch (e: IllegalArgumentException) {
+        Result.failure(IllegalArgumentException("Invalid Bluetooth printer address: $printerAddress", e))
+      } catch (e: Exception) {
+        Result.failure(e)
+      } finally {
+        runCatching { socket?.close() }
       }
-      out.flush()
-      // Allow thermal printer hardware buffer to drain cleanly before closing RFCOMM stream
-      delay(if (isLargeRasterPayload) 500L else 200L)
-      Result.success(Unit)
-    } catch (e: IOException) {
-      Result.failure(
-        IOException("Could not reach thermal printer ($printerAddress). Check that it is powered on and paired.", e),
-      )
-    } catch (e: IllegalArgumentException) {
-      Result.failure(IllegalArgumentException("Invalid Bluetooth printer address: $printerAddress", e))
-    } catch (e: Exception) {
-      Result.failure(e)
-    } finally {
-      runCatching { socket?.close() }
     }
   }
 
@@ -211,7 +243,22 @@ class AndroidBluetoothPrinterClient(
         insecureSocket
       } catch (fallbackError: IOException) {
         runCatching { insecureSocket.close() }
-        throw primaryError
+        val channelSocket = runCatching {
+          @Suppress("DiscouragedPrivateApi")
+          val method = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+          method.invoke(device, 1) as? BluetoothSocket
+        }.getOrNull()
+        if (channelSocket != null) {
+          try {
+            channelSocket.connect()
+            channelSocket
+          } catch (_: IOException) {
+            runCatching { channelSocket.close() }
+            throw primaryError
+          }
+        } else {
+          throw primaryError
+        }
       }
     }
   }

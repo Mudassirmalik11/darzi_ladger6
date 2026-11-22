@@ -7,6 +7,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,6 +76,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.preferences.AppLanguage
+import com.example.core.preferences.AutoCutterMode
+import com.example.core.preferences.PrinterCompatibilityMode
 import com.example.core.preferences.ThemeMode
 import com.example.core.ui.AtelierCard
 import com.example.core.ui.DateFormatUtils
@@ -87,6 +91,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
   viewModel: SettingsViewModel,
@@ -119,6 +124,7 @@ fun SettingsScreen(
   var shopNameInput by rememberSaveable(prefs.shopName) { mutableStateOf(prefs.shopName) }
   var shopContactInput by rememberSaveable(prefs.shopContact) { mutableStateOf(prefs.shopContact) }
   var showPrinterPicker by rememberSaveable { mutableStateOf(false) }
+  var pendingScanAfterPermission by rememberSaveable { mutableStateOf(false) }
   var showAddStaffDialog by rememberSaveable { mutableStateOf(false) }
 
   val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
@@ -126,10 +132,19 @@ fun SettingsScreen(
   ) { results ->
     val connectGranted = results[android.Manifest.permission.BLUETOOTH_CONNECT]
       ?: viewModel.hasBluetoothConnectPermission()
+    val scanGranted = results[android.Manifest.permission.BLUETOOTH_SCAN]
+      ?: viewModel.hasBluetoothScanPermission()
     if (connectGranted) {
       viewModel.loadPairedPrinters()
       showPrinterPicker = true
+      if (pendingScanAfterPermission && scanGranted) {
+        viewModel.startNearbyScan()
+      } else if (pendingScanAfterPermission && !scanGranted) {
+        onShowMessage(permissionMissingText)
+      }
+      pendingScanAfterPermission = false
     } else {
+      pendingScanAfterPermission = false
       onShowMessage(permissionMissingText)
     }
   }
@@ -520,6 +535,76 @@ fun SettingsScreen(
               )
             }
 
+            Text(
+              text = stringResource(R.string.settings_auto_cutter_label),
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            FlowRow(
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+              FilterChip(
+                selected = prefs.autoCutterMode == AutoCutterMode.FULL_CUT,
+                onClick = { viewModel.setAutoCutterMode(AutoCutterMode.FULL_CUT) },
+                label = { Text(stringResource(R.string.settings_auto_cutter_full)) },
+                modifier = Modifier
+                  .heightIn(min = 48.dp)
+                  .testTag("settings_cutter_full"),
+              )
+              FilterChip(
+                selected = prefs.autoCutterMode == AutoCutterMode.PARTIAL_CUT,
+                onClick = { viewModel.setAutoCutterMode(AutoCutterMode.PARTIAL_CUT) },
+                label = { Text(stringResource(R.string.settings_auto_cutter_partial)) },
+                modifier = Modifier
+                  .heightIn(min = 48.dp)
+                  .testTag("settings_cutter_partial"),
+              )
+              FilterChip(
+                selected = prefs.autoCutterMode == AutoCutterMode.OFF,
+                onClick = { viewModel.setAutoCutterMode(AutoCutterMode.OFF) },
+                label = { Text(stringResource(R.string.settings_auto_cutter_off)) },
+                modifier = Modifier
+                  .heightIn(min = 48.dp)
+                  .testTag("settings_cutter_off"),
+              )
+            }
+
+            Text(
+              text = stringResource(R.string.settings_print_mode_label),
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            FlowRow(
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+              FilterChip(
+                selected = prefs.printerCompatibilityMode == PrinterCompatibilityMode.FAST_RASTER,
+                onClick = { viewModel.setPrinterCompatibilityMode(PrinterCompatibilityMode.FAST_RASTER) },
+                label = { Text(stringResource(R.string.settings_print_mode_fast)) },
+                modifier = Modifier
+                  .heightIn(min = 48.dp)
+                  .testTag("settings_print_mode_fast"),
+              )
+              FilterChip(
+                selected = prefs.printerCompatibilityMode == PrinterCompatibilityMode.COMPATIBLE_BITIMAGE,
+                onClick = { viewModel.setPrinterCompatibilityMode(PrinterCompatibilityMode.COMPATIBLE_BITIMAGE) },
+                label = { Text(stringResource(R.string.settings_print_mode_compatible)) },
+                modifier = Modifier
+                  .heightIn(min = 48.dp)
+                  .testTag("settings_print_mode_compatible"),
+              )
+            }
+
+            Text(
+              text = stringResource(R.string.settings_print_mode_hint),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             Row(
               modifier = Modifier.fillMaxWidth(),
               horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -848,7 +933,15 @@ fun SettingsScreen(
       selectedAddress = defaultPrinter?.printerAddress,
       isScanning = isScanningPrinters,
       errorMessage = printerError,
-      onScanNearby = viewModel::startNearbyScan,
+      onScanNearby = {
+        val required = AndroidBluetoothPrinterClient.requiredRuntimePermissions()
+        if (required.isEmpty() || viewModel.hasAllBluetoothPermissions()) {
+          viewModel.startNearbyScan()
+        } else {
+          pendingScanAfterPermission = true
+          bluetoothPermissionLauncher.launch(required)
+        }
+      },
       onOpenBluetoothSettings = {
         runCatching {
           context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
