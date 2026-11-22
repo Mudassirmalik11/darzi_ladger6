@@ -1,5 +1,6 @@
 package com.example.data.remote
 
+import android.os.Build
 import com.example.core.model.DeviceRegistrationStatus
 import com.example.core.model.ShopUserRole
 import com.example.core.preferences.ShopPreferencesRepository
@@ -10,6 +11,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.snapshots
+import java.util.Collections
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -66,13 +68,23 @@ sealed interface DeviceAccessState {
   ) : DeviceAccessState
 }
 
-class ShopCloudRepository(
+open class ShopCloudRepository(
   private val db: FirebaseFirestore,
   private val authSessionProvider: AuthSessionProvider,
   private val shopRepository: ShopRepository,
   private val shopPreferencesRepository: ShopPreferencesRepository,
   private val deviceSyncRepository: DeviceSyncRepository,
 ) {
+
+  private val interactiveSignInUids = Collections.synchronizedSet(mutableSetOf<String>())
+
+  fun markInteractiveSignIn(uid: String) {
+    if (uid.isNotBlank()) {
+      interactiveSignInUids.add(uid)
+    }
+  }
+
+  private fun consumeInteractiveSignIn(uid: String): Boolean = interactiveSignInUids.remove(uid)
 
   private fun requireCurrentUser(): AuthUser {
     return authSessionProvider.currentUser?.takeIf { it.uid.isNotBlank() }
@@ -140,11 +152,13 @@ class ShopCloudRepository(
         snapshot.toObjects(
           DeviceRegistrationDoc::class.java,
           DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
-        ).sortedWith(
-          compareByDescending<DeviceRegistrationDoc> { it.status == STATUS_AUTHORIZED }
-            .thenBy { it.userRole != ShopUserRole.OWNER.name }
-            .thenBy { it.deviceName.lowercase() },
         )
+          .filter { it.status != STATUS_REVOKED }
+          .sortedWith(
+            compareByDescending<DeviceRegistrationDoc> { it.status == STATUS_AUTHORIZED }
+              .thenBy { it.userRole != ShopUserRole.OWNER.name }
+              .thenBy { it.deviceName.lowercase() },
+          )
       },
     )
   }
@@ -166,20 +180,37 @@ class ShopCloudRepository(
     )
   }
 
-  fun observeCurrentSessionStatus(
+  private data class ObservedDeviceState(
+    val authoritativeMissingOrRevoked: Boolean,
+  )
+
+  open fun observeCurrentSessionStatus(
     shopId: String,
     uid: String,
     deviceId: String,
     userRole: ShopUserRole,
   ): Flow<SessionStatusUpdate> = flow {
+    var sawExistingDoc = false
     val deviceFlow = db.collection("shops").document(shopId)
       .collection("devices").document(deviceId)
       .snapshots()
       .map { snap ->
-        snap.toObject(
-          DeviceRegistrationDoc::class.java,
-          DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
-        )
+        if (snap.exists()) {
+          sawExistingDoc = true
+          val doc = snap.toObject(
+            DeviceRegistrationDoc::class.java,
+            DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
+          )
+          ObservedDeviceState(
+            authoritativeMissingOrRevoked = doc == null || doc.status == STATUS_REVOKED,
+          )
+        } else {
+          // Only treat a missing document as replaced/revoked once server confirms deletion
+          // or we previously observed the document in cache/server.
+          ObservedDeviceState(
+            authoritativeMissingOrRevoked = !snap.metadata.isFromCache || sawExistingDoc,
+          )
+        }
       }
 
     if (userRole == ShopUserRole.STAFF) {
@@ -194,19 +225,18 @@ class ShopCloudRepository(
           )
         }
       emitAll(
-        combine(deviceFlow, staffFlow) { deviceDoc, staffDoc ->
+        combine(deviceFlow, staffFlow) { deviceState, staffDoc ->
           when {
             staffDoc != null && staffDoc.status != STATUS_STAFF_ACTIVE -> SessionStatusUpdate.StaffRevoked
-            deviceDoc != null && deviceDoc.status == STATUS_REVOKED ->
-              SessionStatusUpdate.DeviceRevoked(deviceId)
+            deviceState.authoritativeMissingOrRevoked -> SessionStatusUpdate.DeviceRevoked(deviceId)
             else -> SessionStatusUpdate.Active
           }
         },
       )
     } else {
       emitAll(
-        deviceFlow.map { deviceDoc ->
-          if (deviceDoc != null && deviceDoc.status == STATUS_REVOKED) {
+        deviceFlow.map { deviceState ->
+          if (deviceState.authoritativeMissingOrRevoked) {
             SessionStatusUpdate.DeviceRevoked(deviceId)
           } else {
             SessionStatusUpdate.Active
@@ -216,7 +246,7 @@ class ShopCloudRepository(
     }
   }
 
-  suspend fun ensureShopAndInspectDevice(): Result<DeviceAccessState> {
+  open suspend fun ensureShopAndInspectDevice(): Result<DeviceAccessState> {
     val user = try {
       requireCurrentUser()
     } catch (e: Exception) {
@@ -321,15 +351,29 @@ class ShopCloudRepository(
         doc.userUid.ifBlank { doc.ownerUid } == uid
       }
       val remoteCurrent = userDevices.firstOrNull { it.id == localDevice.deviceId }
+      val wasInteractiveSignIn = consumeInteractiveSignIn(uid)
+      val staleUserDevices = userDevices.filter { it.id != localDevice.deviceId }
+      val legacyRevokedShopDevices = if (userRole == ShopUserRole.OWNER) {
+        fetchedDevices.filter { it.id != localDevice.deviceId && it.status == STATUS_REVOKED }
+      } else {
+        emptyList()
+      }
+      val devicesToDelete = (staleUserDevices + legacyRevokedShopDevices).distinctBy { it.id }
 
       val state = when {
         remoteCurrent != null && remoteCurrent.status == STATUS_AUTHORIZED -> {
-          shopRef.collection("devices").document(localDevice.deviceId).update(
+          val batch = db.batch()
+          devicesToDelete.forEach { oldDoc ->
+            batch.delete(shopRef.collection("devices").document(oldDoc.id))
+          }
+          batch.update(
+            shopRef.collection("devices").document(localDevice.deviceId),
             mapOf(
               "lastSeenAt" to FieldValue.serverTimestamp(),
               "updatedAt" to FieldValue.serverTimestamp(),
             ),
-          ).await()
+          )
+          batch.commit().await()
           val syncedLocal = deviceSyncRepository.updateDeviceAuthorization(
             deviceId = localDevice.deviceId,
             shopId = shopId,
@@ -340,29 +384,90 @@ class ShopCloudRepository(
             userUid = uid,
             userRole = userRole.name,
           )
-          DeviceAccessState.Authorized(syncedLocal, userDevices, shopId, userRole)
+          val remaining = fetchedDevices.filter { it.id == localDevice.deviceId }
+          DeviceAccessState.Authorized(syncedLocal, remaining, shopId, userRole)
         }
 
-        remoteCurrent != null && remoteCurrent.status == STATUS_REVOKED -> {
+        // Previously authorized session on this device was replaced/revoked remotely
+        !wasInteractiveSignIn && localDevice.registrationStatus == DeviceRegistrationStatus.AUTHORIZED -> {
           val syncedLocal = deviceSyncRepository.updateDeviceAuthorization(
             deviceId = localDevice.deviceId,
             shopId = shopId,
-            deviceName = remoteCurrent.deviceName,
-            deviceRole = remoteCurrent.deviceRole,
-            status = DeviceRegistrationStatus.REVOKED,
+            deviceName = localDevice.deviceName,
+            deviceRole = localDevice.deviceRole,
+            status = DeviceRegistrationStatus.UNREGISTERED,
             userUid = uid,
             userRole = userRole.name,
           )
           DeviceAccessState.Revoked(syncedLocal, userDevices, shopId, userRole)
         }
 
+        remoteCurrent != null && remoteCurrent.status == STATUS_REVOKED && !wasInteractiveSignIn -> {
+          val syncedLocal = deviceSyncRepository.updateDeviceAuthorization(
+            deviceId = localDevice.deviceId,
+            shopId = shopId,
+            deviceName = remoteCurrent.deviceName,
+            deviceRole = remoteCurrent.deviceRole,
+            status = DeviceRegistrationStatus.UNREGISTERED,
+            userUid = uid,
+            userRole = userRole.name,
+          )
+          DeviceAccessState.Revoked(syncedLocal, userDevices, shopId, userRole)
+        }
+
+        // New device sign-in or interactive sign-in: automatically claim single-device slot
+        // and delete previous device records so Settings never accumulates a device history list.
         else -> {
-          val activeCount = userDevices.count { it.status == STATUS_AUTHORIZED }
-          if (activeCount >= MAX_ACTIVE_DEVICES_PER_USER) {
-            DeviceAccessState.DeviceLimitReached(localDevice, userDevices, shopId, userRole)
-          } else {
-            DeviceAccessState.NeedsRegistration(localDevice, userDevices, shopId, userRole)
+          val defaultName = (localDevice.deviceName.takeIf { it.isNotBlank() && it != "Darzi Device" }
+            ?: Build.MODEL?.takeIf { it.isNotBlank() }
+            ?: "Shop Android").take(60)
+          val defaultRole = localDevice.deviceRole.takeIf { it in VALID_DEVICE_ROLES } ?: "PHONE"
+          val deviceRef = shopRef.collection("devices").document(localDevice.deviceId)
+          val batch = db.batch()
+          devicesToDelete.forEach { oldDoc ->
+            batch.delete(shopRef.collection("devices").document(oldDoc.id))
           }
+          if (remoteCurrent == null) {
+            batch.set(
+              deviceRef,
+              mapOf(
+                "ownerUid" to shopId,
+                "userUid" to uid,
+                "userEmail" to user.email.trim().take(120),
+                "userRole" to userRole.name,
+                "deviceName" to defaultName,
+                "deviceRole" to defaultRole,
+                "status" to STATUS_AUTHORIZED,
+                "appVersion" to "1.0",
+                "registeredAt" to FieldValue.serverTimestamp(),
+                "lastSeenAt" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp(),
+              ),
+            )
+          } else {
+            batch.update(
+              deviceRef,
+              mapOf(
+                "deviceName" to defaultName,
+                "deviceRole" to defaultRole,
+                "status" to STATUS_AUTHORIZED,
+                "lastSeenAt" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp(),
+              ),
+            )
+          }
+          batch.commit().await()
+          val syncedLocal = deviceSyncRepository.updateDeviceAuthorization(
+            deviceId = localDevice.deviceId,
+            shopId = shopId,
+            deviceName = defaultName,
+            deviceRole = defaultRole,
+            status = DeviceRegistrationStatus.AUTHORIZED,
+            registeredAtMillis = System.currentTimeMillis(),
+            userUid = uid,
+            userRole = userRole.name,
+          )
+          DeviceAccessState.Authorized(syncedLocal, emptyList(), shopId, userRole)
         }
       }
 
@@ -423,21 +528,17 @@ class ShopCloudRepository(
         DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
       )
       val userDevices = existingDevices.filter { it.userUid.ifBlank { it.ownerUid } == uid }
-      val activeOthers = userDevices.count {
-        it.status == STATUS_AUTHORIZED && it.id != localDevice.deviceId
-      }
-      if (activeOthers >= MAX_ACTIVE_DEVICES_PER_USER) {
-        return Result.failure(
-          IllegalStateException(
-            "1 of 1 device is already active for this user. Revoke the other device first.",
-          ),
-        )
-      }
+      val devicesToDelete = userDevices.filter { it.id != localDevice.deviceId }
 
       val existingSelf = userDevices.firstOrNull { it.id == localDevice.deviceId }
       val deviceRef = shopRef.collection("devices").document(localDevice.deviceId)
+      val batch = db.batch()
+      devicesToDelete.forEach { oldDoc ->
+        batch.delete(shopRef.collection("devices").document(oldDoc.id))
+      }
       if (existingSelf == null) {
-        deviceRef.set(
+        batch.set(
+          deviceRef,
           mapOf(
             "ownerUid" to shopId,
             "userUid" to uid,
@@ -451,9 +552,10 @@ class ShopCloudRepository(
             "lastSeenAt" to FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp(),
           ),
-        ).await()
+        )
       } else {
-        deviceRef.update(
+        batch.update(
+          deviceRef,
           mapOf(
             "deviceName" to cleanName,
             "deviceRole" to deviceRole,
@@ -462,8 +564,9 @@ class ShopCloudRepository(
             "lastSeenAt" to FieldValue.serverTimestamp(),
             "updatedAt" to FieldValue.serverTimestamp(),
           ),
-        ).await()
+        )
       }
+      batch.commit().await()
 
       val updatedLocal = deviceSyncRepository.updateDeviceAuthorization(
         deviceId = localDevice.deviceId,
@@ -498,16 +601,10 @@ class ShopCloudRepository(
         ?: resolveMembership(uid).shopId
       val path = "shops/$shopId/devices/$targetDeviceId"
       try {
-        db.document(path).update(
-          mapOf(
-            "status" to STATUS_REVOKED,
-            "lastSeenAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp(),
-          ),
-        ).await()
+        db.document(path).delete().await()
       } catch (e: Exception) {
         if (e is CancellationException) throw e
-        handleFirestoreError(e, OperationType.UPDATE, path)
+        handleFirestoreError(e, OperationType.DELETE, path)
         return Result.failure(e)
       }
 
@@ -518,7 +615,7 @@ class ShopCloudRepository(
           shopId = shopId,
           deviceName = localDevice.deviceName,
           deviceRole = localDevice.deviceRole,
-          status = DeviceRegistrationStatus.REVOKED,
+          status = DeviceRegistrationStatus.UNREGISTERED,
           userUid = uid,
           userRole = localDevice.userRole,
         )
@@ -751,16 +848,7 @@ class ShopCloudRepository(
         ),
       )
       activeDevicesSnap.documents.forEach { deviceSnap ->
-        if (deviceSnap.getString("status") == STATUS_AUTHORIZED) {
-          batch.update(
-            deviceSnap.reference,
-            mapOf(
-              "status" to STATUS_REVOKED,
-              "lastSeenAt" to FieldValue.serverTimestamp(),
-              "updatedAt" to FieldValue.serverTimestamp(),
-            ),
-          )
-        }
+        batch.delete(deviceSnap.reference)
       }
       batch.commit().await()
       Result.success(Unit)

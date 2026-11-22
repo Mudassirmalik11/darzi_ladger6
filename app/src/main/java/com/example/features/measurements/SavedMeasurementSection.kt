@@ -24,15 +24,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.model.DamanStyle
+import com.example.core.model.MeasurementFieldKey
 import com.example.core.model.NeckStyle
 import com.example.core.model.PocketStyle
 import com.example.core.model.PocketStyleCodec
+import com.example.core.model.ShalwarType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.ui.DateFormatUtils
 import com.example.features.customers.localizedDamanStyle
 import com.example.features.customers.localizedNeckStyle
 import com.example.features.customers.localizedPocketStyles
+import com.example.features.customers.localizedShalwarType
 import com.example.features.customers.localizedSilaiStyle
 import com.example.features.customers.localizedSleeveStyle
 import com.example.ui.theme.JetBrainsMonoFamily
@@ -60,29 +63,70 @@ fun SavedMeasurementMetricsGrid(
   valueColor: Color,
   mutedText: Color,
   modifier: Modifier = Modifier,
+  shalwarGhair: Double = 0.0,
+  rawValues: Map<String, String> = emptyMap(),
 ) {
   // Compulsory 1..8 in exact measurement entry order
   val compulsoryItems = listOf(
-    SavedMetricEntry("kameez_lambai", stringResource(R.string.meas_kameez_lambai), DateFormatUtils.formatInches(kameezLambai)),
-    SavedMetricEntry("tera", stringResource(R.string.meas_tera), DateFormatUtils.formatInches(tera)),
-    SavedMetricEntry("bazu", stringResource(R.string.meas_bazu), DateFormatUtils.formatInches(bazu)),
-    SavedMetricEntry("gala_collar", stringResource(R.string.meas_gala_collar), DateFormatUtils.formatInches(galaCollar)),
-    SavedMetricEntry("chati", stringResource(R.string.meas_chati), DateFormatUtils.formatInches(chati)),
-    SavedMetricEntry("ghera_daman", stringResource(R.string.meas_ghera_daman), DateFormatUtils.formatInches(gheraDaman)),
-    SavedMetricEntry("shalwar_lambai", stringResource(R.string.meas_shalwar_lambai), DateFormatUtils.formatInches(shalwarLambai)),
-    SavedMetricEntry("paincha", stringResource(R.string.meas_paincha), DateFormatUtils.formatInches(paincha)),
+    SavedMetricEntry(
+      "kameez_lambai",
+      stringResource(R.string.meas_kameez_lambai),
+      DateFormatUtils.formatInches(kameezLambai, rawValues[MeasurementFieldKey.KAMEEZ_LAMBAI.name]),
+    ),
+    SavedMetricEntry(
+      "tera",
+      stringResource(R.string.meas_tera),
+      DateFormatUtils.formatInches(tera, rawValues[MeasurementFieldKey.TERA.name]),
+    ),
+    SavedMetricEntry(
+      "bazu",
+      stringResource(R.string.meas_bazu),
+      DateFormatUtils.formatInches(bazu, rawValues[MeasurementFieldKey.BAZU.name]),
+    ),
+    SavedMetricEntry(
+      "gala_collar",
+      stringResource(R.string.meas_gala_collar),
+      DateFormatUtils.formatInches(galaCollar, rawValues[MeasurementFieldKey.GALA_COLLAR.name]),
+    ),
+    SavedMetricEntry(
+      "chati",
+      stringResource(R.string.meas_chati),
+      DateFormatUtils.formatInches(chati, rawValues[MeasurementFieldKey.CHATI.name]),
+    ),
+    SavedMetricEntry(
+      "ghera_daman",
+      stringResource(R.string.meas_ghera_daman),
+      DateFormatUtils.formatInches(gheraDaman, rawValues[MeasurementFieldKey.GHERA_DAMAN.name]),
+    ),
+    SavedMetricEntry(
+      "shalwar_lambai",
+      stringResource(R.string.meas_shalwar_lambai),
+      DateFormatUtils.formatInches(shalwarLambai, rawValues[MeasurementFieldKey.SHALWAR_LAMBAI.name]),
+    ),
+    SavedMetricEntry(
+      "paincha",
+      stringResource(R.string.meas_paincha),
+      DateFormatUtils.formatInches(paincha, rawValues[MeasurementFieldKey.PAINCHA.name]),
+    ),
   )
 
-  // Optional measurements appear ONLY below compulsory if entered (> 0.0)
+  // Optional measurements appear ONLY below compulsory if entered (> 0.0 or raw dual value)
   val optionalItems = buildList {
-    if (kamar > 0.0) {
-      add(SavedMetricEntry("kamar", stringResource(R.string.meas_kamar), DateFormatUtils.formatInches(kamar)))
+    val kamarRaw = rawValues[MeasurementFieldKey.KAMAR.name]
+    if (kamar > 0.0 || !kamarRaw.isNullOrBlank()) {
+      add(SavedMetricEntry("kamar", stringResource(R.string.meas_kamar), DateFormatUtils.formatInches(kamar, kamarRaw)))
     }
-    if (cuff > 0.0) {
-      add(SavedMetricEntry("cuff", stringResource(R.string.meas_cuff), DateFormatUtils.formatInches(cuff)))
+    val cuffRaw = rawValues[MeasurementFieldKey.CUFF.name]
+    if (cuff > 0.0 || !cuffRaw.isNullOrBlank()) {
+      add(SavedMetricEntry("cuff", stringResource(R.string.meas_cuff), DateFormatUtils.formatInches(cuff, cuffRaw)))
     }
-    if (gheraAsan > 0.0) {
-      add(SavedMetricEntry("ghera_asan", stringResource(R.string.meas_ghera_asan), DateFormatUtils.formatInches(gheraAsan)))
+    val asanRaw = rawValues[MeasurementFieldKey.GHERA_ASAN.name]
+    if (gheraAsan > 0.0 || !asanRaw.isNullOrBlank()) {
+      add(SavedMetricEntry("ghera_asan", stringResource(R.string.meas_ghera_asan), DateFormatUtils.formatInches(gheraAsan, asanRaw)))
+    }
+    val ghairRaw = rawValues[MeasurementFieldKey.SHALWAR_GHAIR.name]
+    if (shalwarGhair > 0.0 || !ghairRaw.isNullOrBlank()) {
+      add(SavedMetricEntry("shalwar_ghair", stringResource(R.string.meas_shalwar_ghair), DateFormatUtils.formatInches(shalwarGhair, ghairRaw)))
     }
   }
 
@@ -216,6 +260,7 @@ fun SavedStylePreferencesGrid(
   primaryText: Color,
   mutedText: Color,
   modifier: Modifier = Modifier,
+  shalwarType: ShalwarType? = null,
 ) {
   val orderedPockets = PocketStyleCodec.ordered(pocketStyles)
   val styleItems = buildList {
@@ -230,6 +275,9 @@ fun SavedStylePreferencesGrid(
     }
     sleeveStyle?.let {
       add(Triple("sleeves", stringResource(R.string.style_sleeves), localizedSleeveStyle(it)))
+    }
+    shalwarType?.let {
+      add(Triple("shalwar", stringResource(R.string.style_shalwar), localizedShalwarType(it)))
     }
     silaiStyle?.let {
       add(Triple("silai", stringResource(R.string.style_silai), localizedSilaiStyle(it)))

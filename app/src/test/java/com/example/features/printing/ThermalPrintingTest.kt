@@ -3,6 +3,7 @@ package com.example.features.printing
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -332,22 +333,22 @@ class ThermalReceiptFormatterTest {
     assertTrue(karigarLines58.all { it.length <= 32 })
     val karigarText = karigarLines58.joinToString("\n")
     assertTrue(karigarText.contains("کسٹمر کی معلومات"))
-    assertTrue(karigarText.contains("آرڈر آئی ڈی: #1025"))
-    assertTrue(karigarText.contains("کسٹمر آئی ڈی: 429"))
+    assertTrue(karigarText.contains("آرڈر آئی ڈی: \u2066#1025\u2069"))
+    assertTrue(karigarText.contains("کسٹمر آئی ڈی: \u2066429\u2069"))
     assertTrue(karigarText.contains("کاریگر ورکشاپ پرچی"))
     assertTrue(karigarText.contains("ناپ (انچ)"))
     assertTrue(karigarText.contains("سلائی و ڈیزائن"))
     assertTrue(karigarText.contains("اضافی نوٹ"))
     assertTrue(
       "Lambai and Tera must be on same line in Urdu karigar slip",
-      karigarLines58.any { it.contains("لمبائی: 41.5") && it.contains("تیرا: 18.25") },
+      karigarLines58.any { it.contains("قمیض لمبائی: 41.5") && it.contains("تیرا: 18.25") },
     )
-    assertTrue(karigarLines58.any { it.contains("آستین: 24") && it.contains("گلہ: 16.5") })
-    assertTrue(karigarLines58.any { it.contains("سینہ: 42") && it.contains("گھیرا دامن: 43") })
-    assertTrue(karigarLines58.any { it.contains("شلوار: 39.5") && it.contains("پونچہ: 7.75") })
+    assertTrue(karigarLines58.any { it.contains("آستین: 24") && it.contains("گلا: 16.5") })
+    assertTrue(karigarLines58.any { it.contains("سینہ: 42") && it.contains("گھیرا / دامن: 43") })
+    assertTrue(karigarLines58.any { it.contains("شلوار: 39.5") && it.contains("پانچہ: 7.75") })
     assertTrue(karigarLines58.any { it.contains("گلا: بین") && it.contains("دامن: چورس") })
     // Verify compulsory 1..8 lines come BEFORE optional Kamar line
-    val ponchaIdx = karigarLines58.indexOfFirst { it.contains("شلوار: 39.5") && it.contains("پونچہ: 7.75") }
+    val ponchaIdx = karigarLines58.indexOfFirst { it.contains("شلوار: 39.5") && it.contains("پانچہ: 7.75") }
     val kamarIdx = karigarLines58.indexOfFirst { it.contains("کمر: 38") }
     assertTrue(ponchaIdx in 0 until kamarIdx)
     assertFalse(karigarText.contains("?"))
@@ -356,12 +357,19 @@ class ThermalReceiptFormatterTest {
   @Test
   fun `buildKarigarParchiData structures customer info, 1 to 8 cells, optionals, and additional notes for Urdu and English`() {
     val (detail, meas) = sampleOrder(orderNumber = 1042, customerName = "Junaid")
-    val style = SnapshotJson.decodeStyle(detail.order.styleSnapshotJson)
+    val style = SnapshotJson.decodeStyle(detail.order.styleSnapshotJson).copy(
+      sleeveStyle = SleeveStyle.KAF,
+      shalwarType = com.example.core.model.ShalwarType.BALOCHI,
+    )
+    val measWithDualAndGhair = meas.copy(
+      shalwarGhair = 92.0,
+      rawValues = mapOf("BAZU" to "23/12"),
+    )
 
     val urduParchi = ThermalReceiptFormatter.buildKarigarParchiData(
       shopName = "الرحمان ٹیلرز",
       orderDetail = detail,
-      measurement = meas,
+      measurement = measWithDualAndGhair,
       style = style,
       language = AppLanguage.URDU,
     )
@@ -369,18 +377,30 @@ class ThermalReceiptFormatterTest {
     assertEquals("#1042", urduParchi.orderIdValue)
     assertEquals("429", urduParchi.customerIdValue)
     assertEquals(
-      listOf("لمبائی", "تیرا", "آستین", "گلہ", "سینہ", "گھیرا دامن", "شلوار", "پونچہ"),
+      listOf("قمیض لمبائی", "تیرا", "آستین", "گلا", "سینہ", "گھیرا / دامن", "شلوار", "پانچہ"),
       urduParchi.compulsoryMetrics.map { it.label },
     )
-    assertEquals(listOf("کمر", "کف", "آسن"), urduParchi.optionalMetrics.map { it.label })
+    assertEquals("23/12", urduParchi.compulsoryMetrics.first { it.label == "آستین" }.value)
+    assertEquals(listOf("کمر", "کف", "آسن", "شلوار گھیرا"), urduParchi.optionalMetrics.map { it.label })
     assertEquals("اضافی نوٹ", urduParchi.additionalNotesTitle)
     assertTrue(urduParchi.additionalNoteLines.any { it.contains("بین") })
+    assertTrue(urduParchi.additionalNoteLines.any { it.contains("کف") })
+    assertTrue(urduParchi.additionalNoteLines.any { it.contains("بلوچی") })
 
     val englishMinimalParchi = ThermalReceiptFormatter.buildKarigarParchiData(
       shopName = "Al-Rehman Tailors",
       orderDetail = detail,
-      measurement = meas.copy(kamar = 0.0, cuff = 0.0, gheraAsan = 0.0),
-      style = StyleSnapshot(),
+      measurement = meas.copy(
+        kamar = 0.0,
+        cuff = 0.0,
+        gheraAsan = 0.0,
+        shalwarGhair = 92.0,
+        rawValues = mapOf("BAZU" to "23/12"),
+      ),
+      style = StyleSnapshot(
+        sleeveStyle = SleeveStyle.KURTA,
+        shalwarType = com.example.core.model.ShalwarType.SMART,
+      ),
       language = AppLanguage.ENGLISH,
     )
     assertEquals("CUSTOMER INFORMATION", englishMinimalParchi.customerInfoTitle)
@@ -390,7 +410,10 @@ class ThermalReceiptFormatterTest {
       listOf("Kameez Lambai", "Teera", "Asteen", "Gala", "Seena", "Ghera / Daman", "Shalwar", "Poncha"),
       englishMinimalParchi.compulsoryMetrics.map { it.label },
     )
-    assertTrue(englishMinimalParchi.optionalMetrics.isEmpty())
+    assertEquals("23/12\"", englishMinimalParchi.compulsoryMetrics.first { it.label == "Asteen" }.value)
+    assertEquals(listOf("Shalwar Ghair"), englishMinimalParchi.optionalMetrics.map { it.label })
+    assertTrue(englishMinimalParchi.additionalNoteLines.any { it.contains("Kurta") })
+    assertTrue(englishMinimalParchi.additionalNoteLines.any { it.contains("Smart") })
   }
 
   @Test
@@ -422,6 +445,7 @@ class ThermalReceiptFormatterTest {
     assertFalse(karigarText.contains("Kamar"))
     assertFalse(karigarText.contains("Cuff"))
     assertFalse(karigarText.contains("Asan"))
+    assertFalse(karigarText.contains("Shalwar Ghair"))
     assertFalse(karigarText.contains("STITCHING STYLES"))
     assertFalse(karigarText.contains("None"))
 
@@ -450,8 +474,75 @@ class ThermalReceiptFormatterTest {
     assertFalse(measSlipUrdu.contains("کمر:"))
     assertFalse(measSlipUrdu.contains("کف:"))
     assertFalse(measSlipUrdu.contains("آسن:"))
+    assertFalse(measSlipUrdu.contains("شلوار گھیرا:"))
     assertFalse(measSlipUrdu.contains("سلائی و ڈیزائن"))
     assertFalse(measSlipUrdu.contains("کوئی نہیں"))
+  }
+
+  @Test
+  fun `urdu dates and phone numbers preserve BiDi visual ordering in both LTR and RTL paragraphs`() {
+    val sampleMillis = 1_795_200_000_000L // Nov 2026
+    val urLocale = java.util.Locale.forLanguageTag("ur")
+    val formattedDate = com.example.core.ui.DateFormatUtils.formatDate(sampleMillis, urLocale)
+    val formattedDateTime = com.example.core.ui.DateFormatUtils.formatDateTime(sampleMillis, urLocale)
+
+    // Strip isolate marks to inspect logical components, and check visual order via java.text.Bidi under LTR
+    assertTrue("Urdu date must use RLI/PDI isolation", formattedDate.startsWith("\u2067") && formattedDate.endsWith("\u2069"))
+    val ltrBidi = java.text.Bidi(formattedDate, java.text.Bidi.DIRECTION_LEFT_TO_RIGHT)
+    val visualTokens = buildString {
+      val visual = java.lang.StringBuilder()
+      val runs = ltrBidi.runCount
+      val runLevels = ByteArray(runs) { ltrBidi.getRunLevel(it).toByte() }
+      val objs = Array<Any>(runs) { it }
+      java.text.Bidi.reorderVisually(runLevels, 0, objs, 0, runs)
+      for (obj in objs) {
+        val r = obj as Int
+        val sub = formattedDate.substring(ltrBidi.getRunStart(r), ltrBidi.getRunLimit(r))
+        val text = if (ltrBidi.getRunLevel(r) % 2 == 1) sub.reversed() else sub
+        visual.append(text)
+      }
+      append(visual.toString())
+    }.replace(Regex("[\u2066-\u2069]"), "").trim()
+    // Ensure day digits and year digits are separated by the month name, never adjacent like "21 2026"
+    assertFalse(
+      "Urdu date must never place day and year adjacent: '$visualTokens'",
+      Regex("\\d+\\s+\\d+").containsMatchIn(visualTokens),
+    )
+    assertTrue(
+      "Urdu date must visually place Arabic month between digits: '$visualTokens'",
+      Regex("\\d+\\s+[^\\d\\s]+\\s+\\d+").containsMatchIn(visualTokens),
+    )
+    assertTrue("Urdu dateTime must include clean LTR time isolate", formattedDateTime.contains("\u2066"))
+
+    val (detail, meas) = sampleOrder(orderNumber = 1055, customerName = "محمد اظہر حسین")
+    val phoneDetail = detail.copy(customerPhone = "0301-2823184")
+    val style = SnapshotJson.decodeStyle(phoneDetail.order.styleSnapshotJson)
+    val karigarUrdu = ThermalReceiptFormatter.formatKarigarSlipLines(
+      shopName = "الرحمان ٹیلرز",
+      orderDetail = phoneDetail,
+      measurement = meas,
+      style = style,
+      paperWidth = PaperWidth.MM_58,
+      preserveUnicode = true,
+      language = AppLanguage.URDU,
+    )
+    assertTrue(karigarUrdu.all { it.length <= 32 })
+    val mobileLine = karigarUrdu.first { it.contains("موبائل:") }
+    assertTrue(
+      "Phone line must isolate 0301-2823184 in LRI/PDI so it never reverses to 2823184-0301",
+      mobileLine.contains("\u20660301-2823184\u2069"),
+    )
+
+    val escPosAscii = ThermalReceiptFormatter.formatCustomerReceiptBytes(
+      shopName = "الرحمان ٹیلرز",
+      shopContact = "0301-2823184",
+      orderDetail = phoneDetail,
+      payments = emptyList(),
+      paperWidth = PaperWidth.MM_58,
+      language = AppLanguage.ENGLISH,
+    ).toString(Charsets.US_ASCII)
+    assertTrue(escPosAscii.contains("0301-2823184"))
+    assertFalse(escPosAscii.contains("?"))
   }
 }
 
@@ -755,51 +846,114 @@ class BluetoothPrintingUiRobolectricTest {
       .assertTextContains("کسٹمر کی معلومات", substring = true)
       .assertTextContains("آرڈر آئی ڈی:", substring = true)
       .assertTextContains("کسٹمر آئی ڈی:", substring = true)
-      .assertTextContains("لمبائی", substring = true)
+      .assertTextContains("0300-7766554", substring = true)
+      .assertTextContains("قمیض لمبائی", substring = true)
       .assertTextContains("40", substring = true)
       .assertTextContains("تیرا", substring = true)
       .assertTextContains("18", substring = true)
-      .assertTextContains("پونچہ", substring = true)
+      .assertTextContains("پانچہ", substring = true)
       .assertTextContains("اضافی نوٹ", substring = true)
 
-    // Verify Urdu ESC/POS raster bytes use GS v 0 (1D 76 30 00) and INIT/FEED_AND_CUT
+    // Verify Parchi 2-column grid keeps Kameez Lambai on the LEFT and Teera on the RIGHT (matching saved measurements)
+    composeTestRule.onNodeWithTag("parchi_compulsory_0", useUnmergedTree = true).performScrollTo()
+    composeTestRule.waitForIdle()
+    val lambaiBounds = composeTestRule.onNodeWithTag("parchi_compulsory_0", useUnmergedTree = true).getBoundsInRoot()
+    val teraBounds = composeTestRule.onNodeWithTag("parchi_compulsory_1", useUnmergedTree = true).getBoundsInRoot()
+    assertTrue(
+      "Kameez Lambai (${lambaiBounds.left}..${lambaiBounds.right}) must appear on the left of Teera (${teraBounds.left}..${teraBounds.right})",
+      lambaiBounds.right > lambaiBounds.left && lambaiBounds.left < teraBounds.left,
+    )
+
+    // Verify Urdu ESC/POS raster bytes for all slip types use INIT + ALIGN_LEFT + small <=24-dot GS v 0 bands + FEED_AND_CUT
     val previewedOrderDetail = runBlocking {
       app.container.orderRepository.observeOrderDetail(orderId).first()!!
     }
-    val sampleBytes = ThermalReceiptFormatter.formatKarigarSlipBytes(
+    val measSnapshot = MeasurementSnapshot(
+      kameezLambai = 40.0,
+      tera = 18.0,
+      bazu = 24.0,
+      chati = 41.0,
+      kamar = 37.0,
+      gheraDaman = 42.0,
+      galaCollar = 16.0,
+      cuff = 9.0,
+      shalwarLambai = 39.0,
+      paincha = 7.5,
+      gheraAsan = 15.5,
+    )
+    val styleSnapshot = StyleSnapshot(
+      neckStyle = NeckStyle.BAN,
+      damanStyle = DamanStyle.GOL,
+      pocketStyle = PocketStyle.TWO_SIDE,
+      sleeveStyle = SleeveStyle.PLAIN,
+      silaiStyle = SilaiStyle.DOUBLE,
+    )
+
+    fun assertValidRasterBytes(bytes: ByteArray, widthMm: Int) {
+      assertEquals(EscPosCommands.INIT[0], bytes[0])
+      assertEquals(EscPosCommands.INIT[1], bytes[1])
+      assertEquals(EscPosCommands.ALIGN_LEFT[0], bytes[2])
+      assertEquals(EscPosCommands.ALIGN_LEFT[1], bytes[3])
+      assertEquals(EscPosCommands.ALIGN_LEFT[2], bytes[4])
+
+      var idx = 5
+      val rasterEnd = bytes.size - EscPosCommands.FEED_AND_CUT.size
+      val expectedBytesPerRow = if (widthMm == 80) 72 else 48
+      var bandCount = 0
+      var nonZeroRasterBytes = 0
+      while (idx < rasterEnd) {
+        assertEquals(0x1D.toByte(), bytes[idx])
+        assertEquals(0x76.toByte(), bytes[idx + 1])
+        assertEquals(0x30.toByte(), bytes[idx + 2])
+        assertEquals(0x00.toByte(), bytes[idx + 3])
+        val xL = bytes[idx + 4].toInt() and 0xFF
+        val xH = bytes[idx + 5].toInt() and 0xFF
+        val yL = bytes[idx + 6].toInt() and 0xFF
+        val yH = bytes[idx + 7].toInt() and 0xFF
+        val xBytes = xL + (xH shl 8)
+        val yRows = yL + (yH shl 8)
+        assertEquals(expectedBytesPerRow, xBytes)
+        assertTrue("GS v 0 band height ($yRows) must stay <= 24 rows to prevent printer buffer overflow", yRows in 1..24)
+        val bandPayloadLen = xBytes * yRows
+        for (p in idx + 8 until idx + 8 + bandPayloadLen) {
+          if (bytes[p].toInt() != 0) nonZeroRasterBytes++
+        }
+        idx += 8 + bandPayloadLen
+        bandCount++
+      }
+      assertEquals("GS v 0 band stream must align cleanly to FEED_AND_CUT", rasterEnd, idx)
+      assertTrue("Expected multiple raster bands, saw $bandCount", bandCount >= 4)
+      assertTrue("Rendered Urdu raster must contain non-zero ink dots", nonZeroRasterBytes > 50)
+      val tail = bytes.copyOfRange(rasterEnd, bytes.size)
+      assertTrue(tail.contentEquals(EscPosCommands.FEED_AND_CUT))
+    }
+
+    val karigarBytes58 = ThermalReceiptFormatter.formatKarigarSlipBytes(
       shopName = "درزی لیجر",
       orderDetail = previewedOrderDetail,
-      measurement = MeasurementSnapshot(
-        kameezLambai = 40.0,
-        tera = 18.0,
-        bazu = 24.0,
-        chati = 41.0,
-        kamar = 37.0,
-        gheraDaman = 42.0,
-        galaCollar = 16.0,
-        cuff = 9.0,
-        shalwarLambai = 39.0,
-        paincha = 7.5,
-        gheraAsan = 15.5,
-      ),
-      style = StyleSnapshot(
-        neckStyle = NeckStyle.BAN,
-        damanStyle = DamanStyle.GOL,
-        pocketStyle = PocketStyle.TWO_SIDE,
-        sleeveStyle = SleeveStyle.PLAIN,
-        silaiStyle = SilaiStyle.DOUBLE,
-      ),
+      measurement = measSnapshot,
+      style = styleSnapshot,
       paperWidth = PaperWidth.MM_58,
       language = AppLanguage.URDU,
     )
-    assertEquals(EscPosCommands.INIT[0], sampleBytes[0])
-    assertEquals(EscPosCommands.INIT[1], sampleBytes[1])
-    // Starts with INIT followed by GS v 0 raster command (0x1D, 0x76, 0x30, 0x00)
-    assertEquals(0x1D.toByte(), sampleBytes[2])
-    assertEquals(0x76.toByte(), sampleBytes[3])
-    assertEquals(0x30.toByte(), sampleBytes[4])
-    assertEquals(0x00.toByte(), sampleBytes[5])
-    val tail = sampleBytes.copyOfRange(sampleBytes.size - EscPosCommands.FEED_AND_CUT.size, sampleBytes.size)
-    assertTrue(tail.contentEquals(EscPosCommands.FEED_AND_CUT))
+    assertValidRasterBytes(karigarBytes58, 58)
+
+    val customerBytes58 = ThermalReceiptFormatter.formatCustomerReceiptBytes(
+      shopName = "درزی لیجر",
+      shopContact = "0300-1234567",
+      orderDetail = previewedOrderDetail,
+      payments = emptyList(),
+      paperWidth = PaperWidth.MM_58,
+      language = AppLanguage.URDU,
+    )
+    assertValidRasterBytes(customerBytes58, 58)
+
+    val testBytes80 = ThermalReceiptFormatter.formatTestPageBytes(
+      shopName = "درزی لیجر",
+      printerName = "Xprinter-80",
+      paperWidth = PaperWidth.MM_80,
+      language = AppLanguage.URDU,
+    )
+    assertValidRasterBytes(testBytes80, 80)
   }
 }

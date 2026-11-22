@@ -168,6 +168,7 @@ fun MeasurementFieldKey.localizedLabel(): String = stringResource(
     MeasurementFieldKey.KAMAR -> R.string.meas_kamar
     MeasurementFieldKey.CUFF -> R.string.meas_cuff
     MeasurementFieldKey.GHERA_ASAN -> R.string.meas_ghera_asan
+    MeasurementFieldKey.SHALWAR_GHAIR -> R.string.meas_shalwar_ghair
   },
 )
 
@@ -417,7 +418,7 @@ fun TailorMeasurementKeyboard(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
           ) {
             KeypadTextKey(
-              label = "*#",
+              label = "/",
               containerColor = utilityKeyColor,
               contentColor = keyTextColor,
               onClick = { onAction(MeasurementKeypadAction.SlashSymbol) },

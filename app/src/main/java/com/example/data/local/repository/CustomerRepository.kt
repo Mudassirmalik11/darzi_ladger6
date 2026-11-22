@@ -6,8 +6,10 @@ import com.example.core.model.MeasurementSnapshot
 import com.example.core.model.NeckStyle
 import com.example.core.model.PhoneNumberUtils
 import com.example.core.model.PocketStyle
+import com.example.core.model.ShalwarType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
+import com.example.core.model.SnapshotJson
 import com.example.core.model.SyncEntityType
 import com.example.core.model.SyncOperation
 import com.example.core.model.TailorValidators
@@ -206,6 +208,7 @@ class CustomerRepository(
     pocketStyle: PocketStyle?,
     sleeveStyle: SleeveStyle? = null,
     silaiStyle: SilaiStyle? = null,
+    shalwarType: ShalwarType? = null,
     label: String = "Standard",
     deviceId: String,
     nowMillis: Long = System.currentTimeMillis(),
@@ -217,6 +220,7 @@ class CustomerRepository(
     pocketStyles = setOfNotNull(pocketStyle),
     sleeveStyle = sleeveStyle,
     silaiStyle = silaiStyle,
+    shalwarType = shalwarType,
     label = label,
     deviceId = deviceId,
     nowMillis = nowMillis,
@@ -230,6 +234,7 @@ class CustomerRepository(
     pocketStyles: Set<PocketStyle> = emptySet(),
     sleeveStyle: SleeveStyle? = null,
     silaiStyle: SilaiStyle? = null,
+    shalwarType: ShalwarType? = null,
     label: String = "Standard",
     deviceId: String,
     nowMillis: Long = System.currentTimeMillis(),
@@ -261,11 +266,14 @@ class CustomerRepository(
           shalwarLambai = snapshot.shalwarLambai,
           paincha = snapshot.paincha,
           gheraAsan = snapshot.gheraAsan,
+          shalwarGhair = snapshot.shalwarGhair,
           neckStyle = neckStyle,
           damanStyle = damanStyle,
           pocketStyles = pocketStyles,
           sleeveStyle = sleeveStyle,
           silaiStyle = silaiStyle,
+          shalwarType = shalwarType,
+          rawInputsJson = SnapshotJson.encodeRawMap(snapshot.rawValues),
           notes = snapshot.notes.trim(),
           createdAt = nowMillis,
           updatedAt = nowMillis,
@@ -297,6 +305,7 @@ class CustomerRepository(
     pocketStyle: PocketStyle?,
     sleeveStyle: SleeveStyle? = null,
     silaiStyle: SilaiStyle? = null,
+    shalwarType: ShalwarType? = null,
     label: String = "Standard",
     deviceId: String,
     nowMillis: Long = System.currentTimeMillis(),
@@ -309,6 +318,7 @@ class CustomerRepository(
     pocketStyles = setOfNotNull(pocketStyle),
     sleeveStyle = sleeveStyle,
     silaiStyle = silaiStyle,
+    shalwarType = shalwarType,
     label = label,
     deviceId = deviceId,
     nowMillis = nowMillis,
@@ -323,6 +333,7 @@ class CustomerRepository(
     pocketStyles: Set<PocketStyle> = emptySet(),
     sleeveStyle: SleeveStyle? = null,
     silaiStyle: SilaiStyle? = null,
+    shalwarType: ShalwarType? = null,
     label: String = "Standard",
     deviceId: String,
     nowMillis: Long = System.currentTimeMillis(),
@@ -351,11 +362,14 @@ class CustomerRepository(
           shalwarLambai = snapshot.shalwarLambai,
           paincha = snapshot.paincha,
           gheraAsan = snapshot.gheraAsan,
+          shalwarGhair = snapshot.shalwarGhair,
           neckStyle = neckStyle,
           damanStyle = damanStyle,
           pocketStyles = pocketStyles,
           sleeveStyle = sleeveStyle,
           silaiStyle = silaiStyle,
+          shalwarType = shalwarType,
+          rawInputsJson = SnapshotJson.encodeRawMap(snapshot.rawValues),
           notes = snapshot.notes.trim(),
           updatedAt = nowMillis,
           version = existing.version + 1L,

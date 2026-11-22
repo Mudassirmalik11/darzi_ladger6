@@ -18,6 +18,8 @@ data class MeasurementSnapshot(
   val shalwarLambai: Double,
   val paincha: Double,
   val gheraAsan: Double,
+  val shalwarGhair: Double = 0.0,
+  val rawValues: Map<String, String> = emptyMap(),
   val notes: String = "",
 )
 
@@ -29,6 +31,7 @@ data class StyleSnapshot(
   val pocketStyles: List<PocketStyle> = emptyList(),
   val sleeveStyle: SleeveStyle? = null,
   val silaiStyle: SilaiStyle? = null,
+  val shalwarType: ShalwarType? = null,
   // Extensible per-suit overrides for future versions without breaking existing orders
   val perSuitOverrides: List<SuitStyleOverride> = emptyList(),
 ) {
@@ -50,6 +53,7 @@ data class SuitStyleOverride(
   val pocketStyles: List<PocketStyle>? = null,
   val sleeveStyle: SleeveStyle? = null,
   val silaiStyle: SilaiStyle? = null,
+  val shalwarType: ShalwarType? = null,
 )
 
 object SnapshotJson {
@@ -69,4 +73,12 @@ object SnapshotJson {
 
   fun decodeStyle(raw: String): StyleSnapshot =
     json.decodeFromString(raw)
+
+  fun encodeRawMap(rawMap: Map<String, String>): String =
+    if (rawMap.isEmpty()) "{}" else json.encodeToString(rawMap)
+
+  fun decodeRawMap(raw: String?): Map<String, String> {
+    if (raw.isNullOrBlank() || raw.trim() == "{}") return emptyMap()
+    return runCatching { json.decodeFromString<Map<String, String>>(raw) }.getOrDefault(emptyMap())
+  }
 }

@@ -62,18 +62,41 @@ class TailorValidationUnitTest {
     assertNotNull(TailorValidators.validateMeasurement(valid.copy(galaCollar = 0.0)))
     assertNotNull(TailorValidators.validateMeasurement(valid.copy(cuff = 1.0)))
     assertNotNull(TailorValidators.validateMeasurement(valid.copy(kamar = 8.0)))
-    assertNull(TailorValidators.validateMeasurement(valid.copy(kamar = 38.5, cuff = 9.5, gheraAsan = 16.0)))
+    assertNull(TailorValidators.validateMeasurement(valid.copy(gheraAsan = 55.0)))
+    assertNotNull(TailorValidators.validateMeasurement(valid.copy(gheraAsan = 65.0)))
+    assertNotNull(TailorValidators.validateMeasurement(valid.copy(shalwarGhair = 15.0)))
+    assertNotNull(TailorValidators.validateMeasurement(valid.copy(shalwarGhair = 135.0)))
+    assertNull(
+      TailorValidators.validateMeasurement(
+        valid.copy(kamar = 38.5, cuff = 9.5, gheraAsan = 55.0, shalwarGhair = 90.0),
+      ),
+    )
   }
 
   @Test
-  fun `fraction parser and real-time field validation handle decimals, mixed fractions, and bounds`() {
+  fun `fraction parser, dual slash parser, and real-time field validation handle ints, floats, and 23 slash 12 format`() {
     assertEquals(41.5, TailorValidators.parseMeasurementInches("41.5")!!, 0.0001)
     assertEquals(41.5, TailorValidators.parseMeasurementInches("41 1/2")!!, 0.0001)
     assertEquals(41.75, TailorValidators.parseMeasurementInches("41-3/4")!!, 0.0001)
     assertEquals(0.25, TailorValidators.parseMeasurementInches("1/4")!!, 0.0001)
+    val dual = TailorValidators.parseMeasurementDetails("23/12")!!
+    assertTrue(dual.isDualSlash)
+    assertEquals(23.0, dual.primary, 0.0001)
+    assertEquals(12.0, dual.secondary!!, 0.0001)
+    val dualFloat = TailorValidators.parseMeasurementDetails("23.5/12.5")!!
+    assertTrue(dualFloat.isDualSlash)
+    assertEquals(23.5, dualFloat.primary, 0.0001)
+    assertEquals(12.5, dualFloat.secondary!!, 0.0001)
+    assertEquals("23/12", TailorValidators.normalizeRawDualValue(" 23/12 "))
+    assertNull(TailorValidators.normalizeRawDualValue("1/2"))
+    assertNull(TailorValidators.normalizeRawDualValue("41 1/2"))
     assertNull(TailorValidators.parseMeasurementInches(""))
     assertNull(TailorValidators.parseMeasurementInches("41."))
     assertNull(TailorValidators.parseMeasurementInches("41 1/0"))
+    assertNull(TailorValidators.parseMeasurementInches("23/"))
+    assertNull(TailorValidators.parseMeasurementInches("/12"))
+    assertNull(TailorValidators.parseMeasurementInches("1/2/3"))
+    assertNull(TailorValidators.parseMeasurementInches("23/0"))
     assertNull(TailorValidators.parseMeasurementInches("abc"))
 
     // Compulsory field: blank allowed while editing, disallowed on save; out-of-range invalid immediately
@@ -105,8 +128,29 @@ class TailorValidationUnitTest {
         allowBlankRequired = false,
       ),
     )
+    assertNull(
+      TailorValidators.validateMeasurementFieldInput(
+        MeasurementFieldKey.BAZU,
+        "23/12",
+        allowBlankRequired = false,
+      ),
+    )
+    assertNotNull(
+      TailorValidators.validateMeasurementFieldInput(
+        MeasurementFieldKey.BAZU,
+        "5/12",
+        allowBlankRequired = true,
+      ),
+    )
+    assertNotNull(
+      TailorValidators.validateMeasurementFieldInput(
+        MeasurementFieldKey.BAZU,
+        "23/",
+        allowBlankRequired = true,
+      ),
+    )
 
-    // Optional field: blank allowed even on save, invalid if out-of-range when entered
+    // Optional fields: Asan 10..60 and Shalwar Ghair 20..130
     assertNull(
       TailorValidators.validateMeasurementFieldInput(
         MeasurementFieldKey.KAMAR,
@@ -121,6 +165,49 @@ class TailorValidationUnitTest {
         allowBlankRequired = true,
       ),
     )
+    assertNull(
+      TailorValidators.validateMeasurementFieldInput(
+        MeasurementFieldKey.GHERA_ASAN,
+        "55",
+        allowBlankRequired = false,
+      ),
+    )
+    assertNotNull(
+      TailorValidators.validateMeasurementFieldInput(
+        MeasurementFieldKey.GHERA_ASAN,
+        "65",
+        allowBlankRequired = true,
+      ),
+    )
+    assertNull(
+      TailorValidators.validateMeasurementFieldInput(
+        MeasurementFieldKey.SHALWAR_GHAIR,
+        "120",
+        allowBlankRequired = false,
+      ),
+    )
+    assertNotNull(
+      TailorValidators.validateMeasurementFieldInput(
+        MeasurementFieldKey.SHALWAR_GHAIR,
+        "135",
+        allowBlankRequired = true,
+      ),
+    )
+    assertNull(
+      TailorValidators.validateMeasurementFieldInput(
+        MeasurementFieldKey.SHALWAR_GHAIR,
+        "48/12",
+        allowBlankRequired = false,
+      ),
+    )
+    val rawMap = TailorValidators.buildRawValuesMap(
+      listOf(
+        MeasurementFieldKey.BAZU to "23/12",
+        MeasurementFieldKey.KAMEEZ_LAMBAI to "41 1/2",
+        MeasurementFieldKey.SHALWAR_GHAIR to "48.5/14",
+      ),
+    )
+    assertEquals(mapOf("BAZU" to "23/12", "SHALWAR_GHAIR" to "48.5/14"), rawMap)
   }
 
   @Test

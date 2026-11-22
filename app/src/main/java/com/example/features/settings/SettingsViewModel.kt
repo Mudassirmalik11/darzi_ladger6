@@ -558,7 +558,10 @@ class SettingsViewModel(
     viewModelScope.launch {
       shopCloudRepository.revokeDevice(deviceId, shopIdOverride = shopId).fold(
         onSuccess = {
-          _deviceActionMessage.value = localizedText("Device access revoked.", "ڈیوائس کی رسائی ختم کر دی گئی۔")
+          _deviceActionMessage.value = localizedText(
+            "Device removed and access revoked.",
+            "ڈیوائس ہٹا دی گئی اور رسائی ختم کر دی گئی۔",
+          )
         },
         onFailure = { err ->
           _deviceActionMessage.value = err.message

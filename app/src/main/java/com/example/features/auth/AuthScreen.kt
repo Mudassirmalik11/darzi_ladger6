@@ -81,6 +81,7 @@ private enum class AuthTabMode {
 fun AuthScreen(
   authSessionProvider: AuthSessionProvider,
   modifier: Modifier = Modifier,
+  onInteractiveSignIn: (String) -> Unit = {},
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -99,7 +100,9 @@ fun AuthScreen(
   val isBusy = isEmailLoading || isGoogleLoading
 
   LaunchedEffect(Unit) {
-    authSessionProvider.attemptAutoSignIn(context)
+    authSessionProvider.attemptAutoSignIn(context)?.let { user ->
+      onInteractiveSignIn(user.uid)
+    }
   }
 
   val submitEmailAuth: () -> Unit = submitEmail@{
@@ -120,7 +123,10 @@ fun AuthScreen(
       isEmailLoading = true
       scope.launch {
         when (val res = authSessionProvider.signInWithEmailPassword(trimmedEmail, password)) {
-          is EmailAuthResult.Success -> isEmailLoading = false
+          is EmailAuthResult.Success -> {
+            onInteractiveSignIn(res.user.uid)
+            isEmailLoading = false
+          }
           is EmailAuthResult.Error -> {
             isEmailLoading = false
             errorMessage = res.message
@@ -145,7 +151,10 @@ fun AuthScreen(
             password = password,
           )
         ) {
-          is EmailAuthResult.Success -> isEmailLoading = false
+          is EmailAuthResult.Success -> {
+            onInteractiveSignIn(res.user.uid)
+            isEmailLoading = false
+          }
           is EmailAuthResult.Error -> {
             isEmailLoading = false
             errorMessage = res.message
@@ -500,7 +509,10 @@ fun AuthScreen(
               isGoogleLoading = true
               scope.launch {
                 when (val res = authSessionProvider.signInWithGoogle(context)) {
-                  is GoogleSignInResult.Success -> isGoogleLoading = false
+                  is GoogleSignInResult.Success -> {
+                    onInteractiveSignIn(res.user.uid)
+                    isGoogleLoading = false
+                  }
                   is GoogleSignInResult.Cancelled -> isGoogleLoading = false
                   is GoogleSignInResult.Error -> {
                     isGoogleLoading = false

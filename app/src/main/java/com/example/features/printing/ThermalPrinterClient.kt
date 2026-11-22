@@ -168,16 +168,21 @@ class AndroidBluetoothPrinterClient(
       val device = adapter.getRemoteDevice(printerAddress)
       socket = connectRfcommSocket(device)
       val out = socket.outputStream
-      val chunkSize = 512
+      val isLargeRasterPayload = bytes.size > 512
+      val chunkSize = if (isLargeRasterPayload) 256 else 512
       var offset = 0
       while (offset < bytes.size) {
         val len = (bytes.size - offset).coerceAtMost(chunkSize)
         out.write(bytes, offset, len)
         offset += len
+        if (isLargeRasterPayload && offset < bytes.size) {
+          out.flush()
+          delay(22L)
+        }
       }
       out.flush()
       // Allow thermal printer hardware buffer to drain cleanly before closing RFCOMM stream
-      delay(150L)
+      delay(if (isLargeRasterPayload) 500L else 200L)
       Result.success(Unit)
     } catch (e: IOException) {
       Result.failure(

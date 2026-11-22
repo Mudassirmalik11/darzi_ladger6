@@ -40,7 +40,7 @@ import com.example.data.local.entities.SyncOutboxEntity
     PrinterConfigEntity::class,
     SyncConflictEntity::class,
   ],
-  version = 5,
+  version = 6,
   exportSchema = true,
 )
 @TypeConverters(DarziConverters::class)
@@ -168,6 +168,20 @@ abstract class DarziDatabase : RoomDatabase() {
       }
     }
 
+    val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          "ALTER TABLE `measurements` ADD COLUMN `shalwarGhair` REAL NOT NULL DEFAULT 0.0",
+        )
+        db.execSQL(
+          "ALTER TABLE `measurements` ADD COLUMN `shalwarType` TEXT",
+        )
+        db.execSQL(
+          "ALTER TABLE `measurements` ADD COLUMN `rawInputsJson` TEXT NOT NULL DEFAULT '{}'",
+        )
+      }
+    }
+
     @Volatile
     private var INSTANCE: DarziDatabase? = null
 
@@ -178,7 +192,13 @@ abstract class DarziDatabase : RoomDatabase() {
           DarziDatabase::class.java,
           DATABASE_NAME,
         )
-          .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+          .addMigrations(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+          )
           .build()
           .also { INSTANCE = it }
       }

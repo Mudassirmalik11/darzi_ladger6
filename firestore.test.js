@@ -125,11 +125,14 @@ function measurementPayload(uid = ALICE_UID, customerId = "cust_1", deviceId = P
     shalwarLambai: 40.0,
     paincha: 7.5,
     gheraAsan: 16.0,
+    shalwarGhair: 46.0,
     neckStyle: "BAN",
     damanStyle: "GOL",
     pocketStyle: "TWO_SIDE",
-    sleeveStyle: "SINGLE_CUFF",
+    sleeveStyle: "KAF",
     silaiStyle: "DOUBLE",
+    shalwarType: "BALOCHI",
+    rawInputsJson: "{\"bazu\":\"23/12\"}",
     notes: "Soft canvas collar",
     version: 1,
     lastModifiedByDevice: deviceId,
@@ -166,14 +169,17 @@ function orderPayload(uid = ALICE_UID, customerId = "cust_1", deviceId = PHONE_I
       shalwarLambai: 40.0,
       paincha: 7.5,
       gheraAsan: 16.0,
+      shalwarGhair: 46.0,
+      rawInputsJson: "{\"bazu\":\"23/12\"}",
       notes: "Soft canvas collar",
     },
     styleSnapshot: {
       neckStyle: "BAN",
       damanStyle: "GOL",
       pocketStyle: "TWO_SIDE",
-      sleeveStyle: "SINGLE_CUFF",
+      sleeveStyle: "KURTA",
       silaiStyle: "DOUBLE",
+      shalwarType: "PANJAMA",
     },
     notes: "Urgent stitch",
     version: 1,
@@ -366,10 +372,24 @@ test("Full domain relational chain: customer -> measurement -> order -> append-o
       kamar: 0,
       cuff: 0,
       gheraAsan: 0,
+      shalwarGhair: 0,
+      rawInputsJson: "{}",
     })
   );
   await assertSucceeds(
     shopRef.collection("measurements").doc("meas_1").set(measurementPayload(ALICE_UID, "cust_1", PHONE_ID))
+  );
+  await assertSucceeds(
+    shopRef.collection("measurements").doc("meas_1").update({
+      shalwarGhair: 52.5,
+      shalwarType: "SMART",
+      sleeveStyle: "KURTA",
+      rawInputsJson: "{\"bazu\":\"23/12\",\"paincha\":\"7.5/8\"}",
+      version: 2,
+      lastModifiedByDevice: PHONE_ID,
+      updatedAtEpochMillis: Date.now(),
+      updatedAt: pastDate(500),
+    })
   );
   await assertSucceeds(
     shopRef.collection("measurements").doc("meas_unselected_styles").set({
@@ -379,12 +399,25 @@ test("Full domain relational chain: customer -> measurement -> order -> append-o
       pocketStyle: "",
       sleeveStyle: "",
       silaiStyle: "",
+      shalwarType: "",
     })
   );
   await assertFails(
     shopRef.collection("measurements").doc("meas_invalid_style").set({
       ...measurementPayload(ALICE_UID, "cust_1", PHONE_ID),
       neckStyle: "INVALID_STYLE",
+    })
+  );
+  await assertFails(
+    shopRef.collection("measurements").doc("meas_invalid_shalwar_type").set({
+      ...measurementPayload(ALICE_UID, "cust_1", PHONE_ID),
+      shalwarType: "INVALID_SHALWAR",
+    })
+  );
+  await assertFails(
+    shopRef.collection("measurements").doc("meas_invalid_shalwar_ghair").set({
+      ...measurementPayload(ALICE_UID, "cust_1", PHONE_ID),
+      shalwarGhair: 250,
     })
   );
 
@@ -401,6 +434,7 @@ test("Full domain relational chain: customer -> measurement -> order -> append-o
         pocketStyle: "",
         sleeveStyle: "",
         silaiStyle: "",
+        shalwarType: "",
       },
     })
   );
@@ -583,4 +617,48 @@ test("Owner can provision staff user atomically; staff can sync on own device bu
     staffDb.collection("shops").doc(ALICE_UID).collection("customers").doc("cust_after_revoke")
       .set(customerPayload(ALICE_UID, STAFF_PHONE_ID))
   );
+});
+
+test("Single-device session transfer: owner and active staff can delete previous device records without cross-user delete", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const staffDb = testEnv.authenticatedContext(STAFF_UID).firestore();
+  const outsiderDb = testEnv.authenticatedContext(BOB_UID).firestore();
+
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await db.collection("shops").doc(ALICE_UID).set(shopPayload(ALICE_UID));
+    await db.collection("shops").doc(ALICE_UID).collection("staff_users").doc(STAFF_UID)
+      .set(staffUserPayload(ALICE_UID, STAFF_UID));
+    await db.collection("staff_links").doc(STAFF_UID)
+      .set(staffLinkPayload(ALICE_UID, STAFF_UID));
+    await db.collection("shops").doc(ALICE_UID).collection("devices").doc(PHONE_ID)
+      .set(devicePayload(ALICE_UID, "PHONE", "AUTHORIZED", ALICE_UID, "owner@alnoor.pk", "OWNER"));
+    await db.collection("shops").doc(ALICE_UID).collection("devices").doc(STAFF_PHONE_ID)
+      .set(devicePayload(ALICE_UID, "PHONE", "AUTHORIZED", STAFF_UID, "staff1@alnoor.pk", "STAFF"));
+  });
+
+  // Outsider Bob cannot delete Alice's or staff's devices
+  await assertFails(outsiderDb.collection("shops").doc(ALICE_UID).collection("devices").doc(PHONE_ID).delete());
+  await assertFails(outsiderDb.collection("shops").doc(ALICE_UID).collection("devices").doc(STAFF_PHONE_ID).delete());
+
+  // Staff cannot delete Owner's device
+  await assertFails(staffDb.collection("shops").doc(ALICE_UID).collection("devices").doc(PHONE_ID).delete());
+
+  // Staff can delete their own old device and register their new device atomically
+  const staffTransferBatch = staffDb.batch();
+  staffTransferBatch.delete(staffDb.collection("shops").doc(ALICE_UID).collection("devices").doc(STAFF_PHONE_ID));
+  staffTransferBatch.set(
+    staffDb.collection("shops").doc(ALICE_UID).collection("devices").doc("staff_phone_02"),
+    devicePayload(ALICE_UID, "PHONE", "AUTHORIZED", STAFF_UID, "staff1@alnoor.pk", "STAFF")
+  );
+  await assertSucceeds(staffTransferBatch.commit());
+
+  // Owner can delete previous Owner device when switching phones and keep Settings clean
+  const ownerTransferBatch = aliceDb.batch();
+  ownerTransferBatch.delete(aliceDb.collection("shops").doc(ALICE_UID).collection("devices").doc(PHONE_ID));
+  ownerTransferBatch.set(
+    aliceDb.collection("shops").doc(ALICE_UID).collection("devices").doc(TABLET_ID),
+    devicePayload(ALICE_UID, "TABLET", "AUTHORIZED", ALICE_UID, "owner@alnoor.pk", "OWNER")
+  );
+  await assertSucceeds(ownerTransferBatch.commit());
 });

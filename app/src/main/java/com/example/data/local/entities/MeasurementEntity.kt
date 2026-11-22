@@ -11,8 +11,10 @@ import com.example.core.model.NeckStyle
 import com.example.core.model.PocketStyle
 import com.example.core.model.PocketStyleCodec
 import com.example.core.model.PocketStyleSetSerializer
+import com.example.core.model.ShalwarType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
+import com.example.core.model.SnapshotJson
 import com.example.core.model.StyleSnapshot
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -51,6 +53,7 @@ data class MeasurementEntity(
   val shalwarLambai: Double,
   val paincha: Double,
   val gheraAsan: Double,
+  val shalwarGhair: Double = 0.0,
   // Style preferences
   val neckStyle: NeckStyle? = null,
   val damanStyle: DamanStyle? = null,
@@ -60,6 +63,8 @@ data class MeasurementEntity(
   val pocketStyles: Set<PocketStyle> = emptySet(),
   val sleeveStyle: SleeveStyle? = null,
   val silaiStyle: SilaiStyle? = null,
+  val shalwarType: ShalwarType? = null,
+  val rawInputsJson: String = "{}",
   val notes: String = "",
   val createdAt: Long,
   val updatedAt: Long,
@@ -67,6 +72,8 @@ data class MeasurementEntity(
   val lastModifiedByDevice: String,
   val isDeleted: Boolean = false,
 ) {
+  fun rawInputsMap(): Map<String, String> = SnapshotJson.decodeRawMap(rawInputsJson)
+
   fun toMeasurementSnapshot(): MeasurementSnapshot = MeasurementSnapshot(
     sourceMeasurementId = measurementId,
     kameezLambai = kameezLambai,
@@ -80,6 +87,8 @@ data class MeasurementEntity(
     shalwarLambai = shalwarLambai,
     paincha = paincha,
     gheraAsan = gheraAsan,
+    shalwarGhair = shalwarGhair,
+    rawValues = rawInputsMap(),
     notes = notes,
   )
 
@@ -92,6 +101,7 @@ data class MeasurementEntity(
       pocketStyles = orderedPockets,
       sleeveStyle = sleeveStyle,
       silaiStyle = silaiStyle,
+      shalwarType = shalwarType,
     )
   }
 }

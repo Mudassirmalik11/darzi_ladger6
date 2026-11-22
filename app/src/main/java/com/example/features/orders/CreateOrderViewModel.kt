@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.core.model.DamanStyle
+import com.example.core.model.MeasurementFieldKey
 import com.example.core.model.MeasurementSnapshot
 import com.example.core.model.NeckStyle
 import com.example.core.model.PaymentMethod
 import com.example.core.model.PocketStyle
 import com.example.core.model.PocketStyleCodec
+import com.example.core.model.ShalwarType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.StyleSnapshot
@@ -46,12 +48,14 @@ data class CreateOrderFormState(
   val shalwarLambai: String = "",
   val paincha: String = "",
   val gheraAsan: String = "",
+  val shalwarGhair: String = "",
   // Style fields
   val neckStyle: NeckStyle? = null,
   val damanStyle: DamanStyle? = null,
   val pocketStyles: Set<PocketStyle> = emptySet(),
   val sleeveStyle: SleeveStyle? = null,
   val silaiStyle: SilaiStyle? = null,
+  val shalwarType: ShalwarType? = null,
   // Order & billing fields
   val suitCount: Int = 1,
   val deliveryDateMillis: Long = PkrFormatUtils.startOfDayPlusDays(3),
@@ -162,11 +166,13 @@ class CreateOrderViewModel(
           shalwarLambai = "",
           paincha = "",
           gheraAsan = "",
+          shalwarGhair = "",
           neckStyle = null,
           damanStyle = null,
           pocketStyles = emptySet(),
           sleeveStyle = null,
           silaiStyle = null,
+          shalwarType = null,
           errorMessage = null,
         )
       }
@@ -176,27 +182,32 @@ class CreateOrderViewModel(
   private fun applyMeasurementToState(
     state: CreateOrderFormState,
     meas: MeasurementEntity,
-  ): CreateOrderFormState = state.copy(
-    hasSavedMeasurement = true,
-    sourceMeasurementId = meas.measurementId,
-    kameezLambai = formatNumeric(meas.kameezLambai),
-    tera = formatNumeric(meas.tera),
-    bazu = formatNumeric(meas.bazu),
-    chati = formatNumeric(meas.chati),
-    kamar = formatOptionalNumeric(meas.kamar),
-    gheraDaman = formatNumeric(meas.gheraDaman),
-    galaCollar = formatNumeric(meas.galaCollar),
-    cuff = formatOptionalNumeric(meas.cuff),
-    shalwarLambai = formatNumeric(meas.shalwarLambai),
-    paincha = formatNumeric(meas.paincha),
-    gheraAsan = formatOptionalNumeric(meas.gheraAsan),
-    neckStyle = meas.neckStyle,
-    damanStyle = meas.damanStyle,
-    pocketStyles = meas.pocketStyles,
-    sleeveStyle = meas.sleeveStyle,
-    silaiStyle = meas.silaiStyle,
-    errorMessage = null,
-  )
+  ): CreateOrderFormState {
+    val rawMap = meas.rawInputsMap()
+    return state.copy(
+      hasSavedMeasurement = true,
+      sourceMeasurementId = meas.measurementId,
+      kameezLambai = initialFieldText(rawMap, MeasurementFieldKey.KAMEEZ_LAMBAI, meas.kameezLambai, required = true),
+      tera = initialFieldText(rawMap, MeasurementFieldKey.TERA, meas.tera, required = true),
+      bazu = initialFieldText(rawMap, MeasurementFieldKey.BAZU, meas.bazu, required = true),
+      chati = initialFieldText(rawMap, MeasurementFieldKey.CHATI, meas.chati, required = true),
+      kamar = initialFieldText(rawMap, MeasurementFieldKey.KAMAR, meas.kamar, required = false),
+      gheraDaman = initialFieldText(rawMap, MeasurementFieldKey.GHERA_DAMAN, meas.gheraDaman, required = true),
+      galaCollar = initialFieldText(rawMap, MeasurementFieldKey.GALA_COLLAR, meas.galaCollar, required = true),
+      cuff = initialFieldText(rawMap, MeasurementFieldKey.CUFF, meas.cuff, required = false),
+      shalwarLambai = initialFieldText(rawMap, MeasurementFieldKey.SHALWAR_LAMBAI, meas.shalwarLambai, required = true),
+      paincha = initialFieldText(rawMap, MeasurementFieldKey.PAINCHA, meas.paincha, required = true),
+      gheraAsan = initialFieldText(rawMap, MeasurementFieldKey.GHERA_ASAN, meas.gheraAsan, required = false),
+      shalwarGhair = initialFieldText(rawMap, MeasurementFieldKey.SHALWAR_GHAIR, meas.shalwarGhair, required = false),
+      neckStyle = meas.neckStyle,
+      damanStyle = meas.damanStyle,
+      pocketStyles = meas.pocketStyles,
+      sleeveStyle = meas.sleeveStyle,
+      silaiStyle = meas.silaiStyle,
+      shalwarType = meas.shalwarType,
+      errorMessage = null,
+    )
+  }
 
   fun updateForm(transform: (CreateOrderFormState) -> CreateOrderFormState) {
     _formState.update { transform(it).copy(errorMessage = null) }
@@ -206,6 +217,23 @@ class CreateOrderViewModel(
     val s = _formState.value
     val customer = s.selectedCustomer
       ?: return setError(localizedAppText("Please select a customer first.", "براہ کرم پہلے گاہک منتخب کریں۔"))
+
+    val rawValues = TailorValidators.buildRawValuesMap(
+      listOf(
+        MeasurementFieldKey.KAMEEZ_LAMBAI to s.kameezLambai,
+        MeasurementFieldKey.TERA to s.tera,
+        MeasurementFieldKey.BAZU to s.bazu,
+        MeasurementFieldKey.GALA_COLLAR to s.galaCollar,
+        MeasurementFieldKey.CHATI to s.chati,
+        MeasurementFieldKey.GHERA_DAMAN to s.gheraDaman,
+        MeasurementFieldKey.SHALWAR_LAMBAI to s.shalwarLambai,
+        MeasurementFieldKey.PAINCHA to s.paincha,
+        MeasurementFieldKey.KAMAR to s.kamar,
+        MeasurementFieldKey.CUFF to s.cuff,
+        MeasurementFieldKey.GHERA_ASAN to s.gheraAsan,
+        MeasurementFieldKey.SHALWAR_GHAIR to s.shalwarGhair,
+      ),
+    )
 
     val snapshot = MeasurementSnapshot(
       sourceMeasurementId = s.sourceMeasurementId,
@@ -241,8 +269,15 @@ class CreateOrderViewModel(
         0.0
       } else {
         TailorValidators.parseMeasurementInches(s.gheraAsan)
-          ?: return setError(localizedAppText("Enter valid Ghera / Asan.", "درست گھیرا / آسن درج کریں۔"))
+          ?: return setError(localizedAppText("Enter valid Asan.", "درست آسن درج کریں۔"))
       },
+      shalwarGhair = if (s.shalwarGhair.isBlank()) {
+        0.0
+      } else {
+        TailorValidators.parseMeasurementInches(s.shalwarGhair)
+          ?: return setError(localizedAppText("Enter valid Shalwar Ghair.", "درست شلوار گھیرا درج کریں۔"))
+      },
+      rawValues = rawValues,
     )
 
     val orderedPockets = PocketStyleCodec.ordered(s.pocketStyles)
@@ -253,6 +288,7 @@ class CreateOrderViewModel(
       pocketStyles = orderedPockets,
       sleeveStyle = s.sleeveStyle,
       silaiStyle = s.silaiStyle,
+      shalwarType = s.shalwarType,
     )
 
     val totalPkr = s.totalBillPkr
@@ -273,6 +309,7 @@ class CreateOrderViewModel(
           pocketStyles = s.pocketStyles,
           sleeveStyle = s.sleeveStyle,
           silaiStyle = s.silaiStyle,
+          shalwarType = s.shalwarType,
           label = s.selectedMeasurement?.label ?: "Standard",
           deviceId = device.deviceId,
         )
@@ -319,6 +356,17 @@ class CreateOrderViewModel(
 
   private fun setError(msg: String) {
     _formState.update { it.copy(errorMessage = msg) }
+  }
+
+  private fun initialFieldText(
+    rawMap: Map<String, String>,
+    key: MeasurementFieldKey,
+    numericValue: Double,
+    required: Boolean,
+  ): String {
+    val raw = rawMap[key.name]?.trim()
+    if (!raw.isNullOrEmpty()) return raw
+    return if (required) formatNumeric(numericValue) else formatOptionalNumeric(numericValue)
   }
 
   private fun formatNumeric(value: Double): String {

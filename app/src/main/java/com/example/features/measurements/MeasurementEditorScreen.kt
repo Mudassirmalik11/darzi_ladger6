@@ -341,32 +341,34 @@ fun MeasurementEditorScreen(
                     },
                   )
 
-                  // Optional field 11
-                  Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                  ) {
-                    MeasurementFieldInput(
-                      key = MeasurementFieldKey.GHERA_ASAN,
-                      value = state.valueFor(MeasurementFieldKey.GHERA_ASAN),
-                      errorText = state.errorFor(MeasurementFieldKey.GHERA_ASAN),
-                      storedSelection = selectionMap[MeasurementFieldKey.GHERA_ASAN],
-                      focusRequester = focusRequesters.getValue(MeasurementFieldKey.GHERA_ASAN),
-                      bringIntoViewRequester = bringIntoViewRequesters.getValue(MeasurementFieldKey.GHERA_ASAN),
-                      onFocused = { activeMeasurementKey = MeasurementFieldKey.GHERA_ASAN },
-                      onValueChanged = { raw, sel ->
-                        selectionMap[MeasurementFieldKey.GHERA_ASAN] = sel
-                        viewModel.updateMeasurementField(MeasurementFieldKey.GHERA_ASAN, raw)
-                      },
-                      onImeNext = {
+                  // Optional fields 11..12 (Asan & Shalwar Ghair)
+                  MeasurementFieldRow(
+                    leftKey = MeasurementFieldKey.GHERA_ASAN,
+                    rightKey = MeasurementFieldKey.SHALWAR_GHAIR,
+                    state = state,
+                    selectionMap = selectionMap,
+                    focusRequesters = focusRequesters,
+                    bringIntoViewRequesters = bringIntoViewRequesters,
+                    isRightLastField = true,
+                    onFocused = { key -> activeMeasurementKey = key },
+                    onValueChanged = { key, raw, sel ->
+                      selectionMap[key] = sel
+                      viewModel.updateMeasurementField(key, raw)
+                    },
+                    onNextKey = { key ->
+                      val ordered = MeasurementFieldKey.entries
+                      val nextIdx = ordered.indexOf(key) + 1
+                      if (nextIdx < ordered.size) {
+                        val nextKey = ordered[nextIdx]
+                        selectionMap[nextKey] = TextRange(state.valueFor(nextKey).length)
+                        activeMeasurementKey = nextKey
+                        focusRequesters[nextKey]?.requestFocus()
+                      } else {
                         focusManager.clearFocus()
                         activeMeasurementKey = null
-                      },
-                      isLastField = true,
-                      modifier = Modifier.weight(1f),
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                  }
+                      }
+                    },
+                  )
                 }
               }
             }
@@ -405,6 +407,11 @@ fun MeasurementEditorScreen(
             onSelectSilaiStyle = { style ->
               activeMeasurementKey = null
               viewModel.updateField { it.copy(silaiStyle = style) }
+            },
+            shalwarType = state.shalwarType,
+            onSelectShalwarType = { style ->
+              activeMeasurementKey = null
+              viewModel.updateField { it.copy(shalwarType = style) }
             },
           )
 
@@ -462,6 +469,7 @@ private fun MeasurementFieldRow(
   selectionMap: Map<MeasurementFieldKey, TextRange>,
   focusRequesters: Map<MeasurementFieldKey, FocusRequester>,
   bringIntoViewRequesters: Map<MeasurementFieldKey, BringIntoViewRequester>,
+  isRightLastField: Boolean = false,
   onFocused: (MeasurementFieldKey) -> Unit,
   onValueChanged: (MeasurementFieldKey, String, TextRange) -> Unit,
   onNextKey: (MeasurementFieldKey) -> Unit,
@@ -493,7 +501,7 @@ private fun MeasurementFieldRow(
       onFocused = { onFocused(rightKey) },
       onValueChanged = { raw, sel -> onValueChanged(rightKey, raw, sel) },
       onImeNext = { onNextKey(rightKey) },
-      isLastField = false,
+      isLastField = isRightLastField,
       modifier = Modifier.weight(1f),
     )
   }

@@ -10,12 +10,14 @@ import android.text.StaticLayout
 import android.text.TextDirectionHeuristics
 import android.text.TextPaint
 import com.example.core.model.DamanStyle
+import com.example.core.model.MeasurementFieldKey
 import com.example.core.model.MeasurementSnapshot
 import com.example.core.model.NeckStyle
 import com.example.core.model.OrderStatus
 import com.example.core.model.PaymentMethod
 import com.example.core.model.PaymentStatus
 import com.example.core.model.PocketStyle
+import com.example.core.model.ShalwarType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.StyleSnapshot
@@ -271,12 +273,12 @@ object ThermalReceiptFormatter {
     lines.addAll(centerText(resolvedShop, cols, preserveUnicode))
     if (shopContact.isNotBlank()) {
       val telPrefix = if (isUrdu) "فون:" else "Tel:"
-      lines.addAll(centerText("$telPrefix $shopContact", cols, preserveUnicode))
+      lines.addAll(centerText("$telPrefix ${isolateLtr(shopContact, isUrdu)}", cols, preserveUnicode))
     }
     lines.add(divider(cols, '='))
 
     val orderNumberLabel = if (isUrdu) {
-      order.orderNumber?.let { "آرڈر #$it" } ?: "آرڈر: نمبر زیر التوا"
+      order.orderNumber?.let { "آرڈر ${isolateLtr("#$it", true)}" } ?: "آرڈر: نمبر زیر التوا"
     } else {
       order.orderNumber?.let { "ORDER #$it" } ?: "ORDER: NUMBER PENDING"
     }
@@ -286,7 +288,7 @@ object ThermalReceiptFormatter {
 
     if (isUrdu) {
       lines.addAll(wrapText("گاہک: $customerName", cols, preserveUnicode))
-      lines.addAll(wrapText("موبائل: $customerPhone", cols, preserveUnicode))
+      lines.addAll(wrapText("موبائل: ${isolateLtr(customerPhone, true)}", cols, preserveUnicode))
       lines.addAll(
         formatInlinePair(
           "سوٹ: ${order.suitCount}",
@@ -586,11 +588,11 @@ object ThermalReceiptFormatter {
       lines.add(divider(cols, '='))
       lines.addAll(centerText("کسٹمر کی معلومات", cols, preserveUnicode))
       lines.add(divider(cols, '='))
-      lines.addAll(wrapText("آرڈر آئی ڈی: $orderIdValue", cols, preserveUnicode))
-      lines.addAll(wrapText("کسٹمر آئی ڈی: $resolvedCustomerId", cols, preserveUnicode))
+      lines.addAll(wrapText("آرڈر آئی ڈی: ${isolateLtr(orderIdValue, true)}", cols, preserveUnicode))
+      lines.addAll(wrapText("کسٹمر آئی ڈی: ${isolateLtr(resolvedCustomerId, true)}", cols, preserveUnicode))
       lines.addAll(wrapText("نام: $customerName", cols, preserveUnicode))
       if (orderDetail.customerPhone.isNotBlank()) {
-        lines.addAll(wrapText("موبائل: ${orderDetail.customerPhone}", cols, preserveUnicode))
+        lines.addAll(wrapText("موبائل: ${isolateLtr(orderDetail.customerPhone, true)}", cols, preserveUnicode))
       }
       if (resolvedAddress.isNotBlank()) {
         lines.addAll(wrapText("پتہ: $resolvedAddress", cols, preserveUnicode))
@@ -736,11 +738,11 @@ object ThermalReceiptFormatter {
       lines.addAll(centerText("کسٹمر کی معلومات", cols, preserveUnicode))
       lines.add(divider(cols, '='))
       customerDisplayId?.trim()?.takeIf { it.isNotEmpty() }?.let { id ->
-        lines.addAll(wrapText("کسٹمر آئی ڈی: $id", cols, preserveUnicode))
+        lines.addAll(wrapText("کسٹمر آئی ڈی: ${isolateLtr(id, true)}", cols, preserveUnicode))
       }
       lines.addAll(wrapText("نام: $resolvedName", cols, preserveUnicode))
       if (customerPhone.isNotBlank()) {
-        lines.addAll(wrapText("موبائل: $customerPhone", cols, preserveUnicode))
+        lines.addAll(wrapText("موبائل: ${isolateLtr(customerPhone, true)}", cols, preserveUnicode))
       }
       lines.addAll(wrapText("تاریخ: $dateText", cols, preserveUnicode))
       lines.addAll(wrapText("قسم: $resolvedLabel", cols, preserveUnicode))
@@ -1065,9 +1067,10 @@ object ThermalReceiptFormatter {
       paint: TextPaint,
       maxWidth: Int,
       alignment: Layout.Alignment = alignNormal,
+      textDirectionHeuristic: android.text.TextDirectionHeuristic = direction,
     ): StaticLayout = StaticLayout.Builder.obtain(text, 0, text.length, paint, maxWidth.coerceAtLeast(32))
       .setAlignment(alignment)
-      .setTextDirection(direction)
+      .setTextDirection(textDirectionHeuristic)
       .setLineSpacing(4f, 1.0f)
       .setIncludePad(true)
       .build()
@@ -1077,14 +1080,14 @@ object ThermalReceiptFormatter {
     val infoInnerWidth = contentWidth - 20
     val infoLines = buildList {
       if (!data.orderIdLabel.isNullOrBlank() && !data.orderIdValue.isNullOrBlank()) {
-        add(makeLayout("${data.orderIdLabel}: ${data.orderIdValue}", infoBoldPaint, infoInnerWidth))
+        add(makeLayout("${data.orderIdLabel}: ${isolateLtr(data.orderIdValue, isRtl)}", infoBoldPaint, infoInnerWidth))
       }
       if (!data.customerIdLabel.isNullOrBlank() && !data.customerIdValue.isNullOrBlank()) {
-        add(makeLayout("${data.customerIdLabel}: ${data.customerIdValue}", infoBoldPaint, infoInnerWidth))
+        add(makeLayout("${data.customerIdLabel}: ${isolateLtr(data.customerIdValue, isRtl)}", infoBoldPaint, infoInnerWidth))
       }
       add(makeLayout("${data.nameLabel}: ${data.nameValue}", infoBoldPaint, infoInnerWidth))
       if (data.mobileValue.isNotBlank()) {
-        add(makeLayout("${data.mobileLabel}: ${data.mobileValue}", infoBodyPaint, infoInnerWidth))
+        add(makeLayout("${data.mobileLabel}: ${isolateLtr(data.mobileValue, isRtl)}", infoBodyPaint, infoInnerWidth))
       } else {
         add(makeLayout("${data.mobileLabel}:", infoBodyPaint, infoInnerWidth))
       }
@@ -1127,14 +1130,26 @@ object ThermalReceiptFormatter {
       while (idx < cells.size) {
         val c1 = cells[idx]
         val l1 = makeLayout(c1.label, cellLabelPaint, cellTextWidth, Layout.Alignment.ALIGN_CENTER)
-        val v1 = makeLayout(c1.value, cellValuePaint, cellTextWidth, Layout.Alignment.ALIGN_CENTER)
-        val r1 = RasterCell(l1, v1, l1.height + v1.height + 18)
+        val v1 = makeLayout(
+          c1.value,
+          cellValuePaint,
+          cellTextWidth,
+          Layout.Alignment.ALIGN_CENTER,
+          TextDirectionHeuristics.LTR,
+        )
+        val r1 = RasterCell(l1, v1, l1.height + v1.height + 14)
 
         val r2 = if (idx + 1 < cells.size) {
           val c2 = cells[idx + 1]
           val l2 = makeLayout(c2.label, cellLabelPaint, cellTextWidth, Layout.Alignment.ALIGN_CENTER)
-          val v2 = makeLayout(c2.value, cellValuePaint, cellTextWidth, Layout.Alignment.ALIGN_CENTER)
-          RasterCell(l2, v2, l2.height + v2.height + 18)
+          val v2 = makeLayout(
+            c2.value,
+            cellValuePaint,
+            cellTextWidth,
+            Layout.Alignment.ALIGN_CENTER,
+            TextDirectionHeuristics.LTR,
+          )
+          RasterCell(l2, v2, l2.height + v2.height + 14)
         } else {
           null
         }
@@ -1218,11 +1233,12 @@ object ThermalReceiptFormatter {
           val midX = pad + colWidth.toFloat()
           canvas.drawLine(midX, rowTop, midX, rowBottom, gridStroke)
 
-          val startCellX = if (isRtl) midX + 6f else pad + 6f
-          val endCellX = if (isRtl) pad + 6f else midX + 6f
+          // Keep saved measurements grid Left-to-Right (Kameez Lambai Left, Teera Right)
+          val startCellX = pad + 6f
+          val endCellX = midX + 6f
 
           canvas.save()
-          canvas.translate(startCellX, rowTop + 8f)
+          canvas.translate(startCellX, rowTop + 6f)
           row.startCell.label.draw(canvas)
           canvas.translate(0f, row.startCell.label.height + 2f)
           row.startCell.value.draw(canvas)
@@ -1230,7 +1246,7 @@ object ThermalReceiptFormatter {
 
           row.endCell?.let { endCell ->
             canvas.save()
-            canvas.translate(endCellX, rowTop + 8f)
+            canvas.translate(endCellX, rowTop + 6f)
             endCell.label.draw(canvas)
             canvas.translate(0f, endCell.label.height + 2f)
             endCell.value.draw(canvas)
@@ -1275,10 +1291,12 @@ object ThermalReceiptFormatter {
     val totalHeight = bitmap.height
     val out = ByteArrayOutputStream()
     out.write(EscPosCommands.INIT)
+    out.write(EscPosCommands.ALIGN_LEFT)
     val bytesPerRow = widthPx / 8
     val xL = (bytesPerRow and 0xFF).toByte()
     val xH = ((bytesPerRow shr 8) and 0xFF).toByte()
-    val maxSliceHeight = 256
+    // Small 24-dot bands (<1.8 KB per GS v 0 command) prevent printer FIFO overflow & coding garbage
+    val maxSliceHeight = 24
     var startY = 0
     val pixels = IntArray(widthPx)
 
@@ -1295,11 +1313,12 @@ object ThermalReceiptFormatter {
           val baseX = byteIdx * 8
           for (bit in 0 until 8) {
             val pixel = pixels[baseX + bit]
+            val a = Color.alpha(pixel)
             val r = Color.red(pixel)
             val g = Color.green(pixel)
             val b = Color.blue(pixel)
             val luma = (r * 30 + g * 59 + b * 11) / 100
-            if (luma < 160) {
+            if (a > 128 && luma < 175) {
               packed = packed or (1 shl (7 - bit))
             }
           }
@@ -1485,7 +1504,9 @@ object ThermalReceiptFormatter {
 
   private fun formatCompactUrduPkr(amountPkr: Long): String = commaNumberFormat.format(amountPkr)
 
-  private fun formatUrduInches(value: Double): String {
+  private fun formatUrduInches(value: Double, rawOverride: String? = null): String {
+    val rawTrimmed = rawOverride?.trim()
+    if (!rawTrimmed.isNullOrEmpty()) return rawTrimmed
     val rounded = kotlin.math.round(value * 100.0) / 100.0
     return if (rounded % 1.0 == 0.0) {
       rounded.toInt().toString()
@@ -1523,25 +1544,25 @@ object ThermalReceiptFormatter {
     isUrdu: Boolean,
   ): List<ParchiMetricCell> = if (isUrdu) {
     listOf(
-      ParchiMetricCell("لمبائی", formatUrduInches(measurement.kameezLambai)),
-      ParchiMetricCell("تیرا", formatUrduInches(measurement.tera)),
-      ParchiMetricCell("آستین", formatUrduInches(measurement.bazu)),
-      ParchiMetricCell("گلہ", formatUrduInches(measurement.galaCollar)),
-      ParchiMetricCell("سینہ", formatUrduInches(measurement.chati)),
-      ParchiMetricCell("گھیرا دامن", formatUrduInches(measurement.gheraDaman)),
-      ParchiMetricCell("شلوار", formatUrduInches(measurement.shalwarLambai)),
-      ParchiMetricCell("پونچہ", formatUrduInches(measurement.paincha)),
+      ParchiMetricCell("قمیض لمبائی", formatUrduInches(measurement.kameezLambai, measurement.rawValues[MeasurementFieldKey.KAMEEZ_LAMBAI.name])),
+      ParchiMetricCell("تیرا", formatUrduInches(measurement.tera, measurement.rawValues[MeasurementFieldKey.TERA.name])),
+      ParchiMetricCell("آستین", formatUrduInches(measurement.bazu, measurement.rawValues[MeasurementFieldKey.BAZU.name])),
+      ParchiMetricCell("گلا", formatUrduInches(measurement.galaCollar, measurement.rawValues[MeasurementFieldKey.GALA_COLLAR.name])),
+      ParchiMetricCell("سینہ", formatUrduInches(measurement.chati, measurement.rawValues[MeasurementFieldKey.CHATI.name])),
+      ParchiMetricCell("گھیرا / دامن", formatUrduInches(measurement.gheraDaman, measurement.rawValues[MeasurementFieldKey.GHERA_DAMAN.name])),
+      ParchiMetricCell("شلوار", formatUrduInches(measurement.shalwarLambai, measurement.rawValues[MeasurementFieldKey.SHALWAR_LAMBAI.name])),
+      ParchiMetricCell("پانچہ", formatUrduInches(measurement.paincha, measurement.rawValues[MeasurementFieldKey.PAINCHA.name])),
     )
   } else {
     listOf(
-      ParchiMetricCell("Kameez Lambai", DateFormatUtils.formatInches(measurement.kameezLambai)),
-      ParchiMetricCell("Teera", DateFormatUtils.formatInches(measurement.tera)),
-      ParchiMetricCell("Asteen", DateFormatUtils.formatInches(measurement.bazu)),
-      ParchiMetricCell("Gala", DateFormatUtils.formatInches(measurement.galaCollar)),
-      ParchiMetricCell("Seena", DateFormatUtils.formatInches(measurement.chati)),
-      ParchiMetricCell("Ghera / Daman", DateFormatUtils.formatInches(measurement.gheraDaman)),
-      ParchiMetricCell("Shalwar", DateFormatUtils.formatInches(measurement.shalwarLambai)),
-      ParchiMetricCell("Poncha", DateFormatUtils.formatInches(measurement.paincha)),
+      ParchiMetricCell("Kameez Lambai", DateFormatUtils.formatInches(measurement.kameezLambai, measurement.rawValues[MeasurementFieldKey.KAMEEZ_LAMBAI.name])),
+      ParchiMetricCell("Teera", DateFormatUtils.formatInches(measurement.tera, measurement.rawValues[MeasurementFieldKey.TERA.name])),
+      ParchiMetricCell("Asteen", DateFormatUtils.formatInches(measurement.bazu, measurement.rawValues[MeasurementFieldKey.BAZU.name])),
+      ParchiMetricCell("Gala", DateFormatUtils.formatInches(measurement.galaCollar, measurement.rawValues[MeasurementFieldKey.GALA_COLLAR.name])),
+      ParchiMetricCell("Seena", DateFormatUtils.formatInches(measurement.chati, measurement.rawValues[MeasurementFieldKey.CHATI.name])),
+      ParchiMetricCell("Ghera / Daman", DateFormatUtils.formatInches(measurement.gheraDaman, measurement.rawValues[MeasurementFieldKey.GHERA_DAMAN.name])),
+      ParchiMetricCell("Shalwar", DateFormatUtils.formatInches(measurement.shalwarLambai, measurement.rawValues[MeasurementFieldKey.SHALWAR_LAMBAI.name])),
+      ParchiMetricCell("Poncha", DateFormatUtils.formatInches(measurement.paincha, measurement.rawValues[MeasurementFieldKey.PAINCHA.name])),
     )
   }
 
@@ -1550,15 +1571,41 @@ object ThermalReceiptFormatter {
     isUrdu: Boolean,
   ): List<ParchiMetricCell> = if (isUrdu) {
     buildList {
-      if (measurement.kamar > 0.0) add(ParchiMetricCell("کمر", formatUrduInches(measurement.kamar)))
-      if (measurement.cuff > 0.0) add(ParchiMetricCell("کف", formatUrduInches(measurement.cuff)))
-      if (measurement.gheraAsan > 0.0) add(ParchiMetricCell("آسن", formatUrduInches(measurement.gheraAsan)))
+      val kamarRaw = measurement.rawValues[MeasurementFieldKey.KAMAR.name]
+      if (measurement.kamar > 0.0 || !kamarRaw.isNullOrBlank()) {
+        add(ParchiMetricCell("کمر", formatUrduInches(measurement.kamar, kamarRaw)))
+      }
+      val cuffRaw = measurement.rawValues[MeasurementFieldKey.CUFF.name]
+      if (measurement.cuff > 0.0 || !cuffRaw.isNullOrBlank()) {
+        add(ParchiMetricCell("کف", formatUrduInches(measurement.cuff, cuffRaw)))
+      }
+      val asanRaw = measurement.rawValues[MeasurementFieldKey.GHERA_ASAN.name]
+      if (measurement.gheraAsan > 0.0 || !asanRaw.isNullOrBlank()) {
+        add(ParchiMetricCell("آسن", formatUrduInches(measurement.gheraAsan, asanRaw)))
+      }
+      val ghairRaw = measurement.rawValues[MeasurementFieldKey.SHALWAR_GHAIR.name]
+      if (measurement.shalwarGhair > 0.0 || !ghairRaw.isNullOrBlank()) {
+        add(ParchiMetricCell("شلوار گھیرا", formatUrduInches(measurement.shalwarGhair, ghairRaw)))
+      }
     }
   } else {
     buildList {
-      if (measurement.kamar > 0.0) add(ParchiMetricCell("Kamar", DateFormatUtils.formatInches(measurement.kamar)))
-      if (measurement.cuff > 0.0) add(ParchiMetricCell("Cuff", DateFormatUtils.formatInches(measurement.cuff)))
-      if (measurement.gheraAsan > 0.0) add(ParchiMetricCell("Ghera / Asan", DateFormatUtils.formatInches(measurement.gheraAsan)))
+      val kamarRaw = measurement.rawValues[MeasurementFieldKey.KAMAR.name]
+      if (measurement.kamar > 0.0 || !kamarRaw.isNullOrBlank()) {
+        add(ParchiMetricCell("Kamar", DateFormatUtils.formatInches(measurement.kamar, kamarRaw)))
+      }
+      val cuffRaw = measurement.rawValues[MeasurementFieldKey.CUFF.name]
+      if (measurement.cuff > 0.0 || !cuffRaw.isNullOrBlank()) {
+        add(ParchiMetricCell("Cuff", DateFormatUtils.formatInches(measurement.cuff, cuffRaw)))
+      }
+      val asanRaw = measurement.rawValues[MeasurementFieldKey.GHERA_ASAN.name]
+      if (measurement.gheraAsan > 0.0 || !asanRaw.isNullOrBlank()) {
+        add(ParchiMetricCell("Asan", DateFormatUtils.formatInches(measurement.gheraAsan, asanRaw)))
+      }
+      val ghairRaw = measurement.rawValues[MeasurementFieldKey.SHALWAR_GHAIR.name]
+      if (measurement.shalwarGhair > 0.0 || !ghairRaw.isNullOrBlank()) {
+        add(ParchiMetricCell("Shalwar Ghair", DateFormatUtils.formatInches(measurement.shalwarGhair, ghairRaw)))
+      }
     }
   }
 
@@ -1567,25 +1614,25 @@ object ThermalReceiptFormatter {
     isUrdu: Boolean,
   ): List<String> = if (isUrdu) {
     listOf(
-      "لمبائی: ${formatUrduInches(measurement.kameezLambai)}",
-      "تیرا: ${formatUrduInches(measurement.tera)}",
-      "آستین: ${formatUrduInches(measurement.bazu)}",
-      "گلہ: ${formatUrduInches(measurement.galaCollar)}",
-      "سینہ: ${formatUrduInches(measurement.chati)}",
-      "گھیرا دامن: ${formatUrduInches(measurement.gheraDaman)}",
-      "شلوار: ${formatUrduInches(measurement.shalwarLambai)}",
-      "پونچہ: ${formatUrduInches(measurement.paincha)}",
+      "قمیض لمبائی: ${formatUrduInches(measurement.kameezLambai, measurement.rawValues[MeasurementFieldKey.KAMEEZ_LAMBAI.name])}",
+      "تیرا: ${formatUrduInches(measurement.tera, measurement.rawValues[MeasurementFieldKey.TERA.name])}",
+      "آستین: ${formatUrduInches(measurement.bazu, measurement.rawValues[MeasurementFieldKey.BAZU.name])}",
+      "گلا: ${formatUrduInches(measurement.galaCollar, measurement.rawValues[MeasurementFieldKey.GALA_COLLAR.name])}",
+      "سینہ: ${formatUrduInches(measurement.chati, measurement.rawValues[MeasurementFieldKey.CHATI.name])}",
+      "گھیرا / دامن: ${formatUrduInches(measurement.gheraDaman, measurement.rawValues[MeasurementFieldKey.GHERA_DAMAN.name])}",
+      "شلوار: ${formatUrduInches(measurement.shalwarLambai, measurement.rawValues[MeasurementFieldKey.SHALWAR_LAMBAI.name])}",
+      "پانچہ: ${formatUrduInches(measurement.paincha, measurement.rawValues[MeasurementFieldKey.PAINCHA.name])}",
     )
   } else {
     listOf(
-      "Lambai: ${DateFormatUtils.formatInches(measurement.kameezLambai)}",
-      "Tera: ${DateFormatUtils.formatInches(measurement.tera)}",
-      "Asteen: ${DateFormatUtils.formatInches(measurement.bazu)}",
-      "Gala: ${DateFormatUtils.formatInches(measurement.galaCollar)}",
-      "Seena: ${DateFormatUtils.formatInches(measurement.chati)}",
-      "Ghera: ${DateFormatUtils.formatInches(measurement.gheraDaman)}",
-      "Shalwar: ${DateFormatUtils.formatInches(measurement.shalwarLambai)}",
-      "Poncha: ${DateFormatUtils.formatInches(measurement.paincha)}",
+      "Lambai: ${DateFormatUtils.formatInches(measurement.kameezLambai, measurement.rawValues[MeasurementFieldKey.KAMEEZ_LAMBAI.name])}",
+      "Tera: ${DateFormatUtils.formatInches(measurement.tera, measurement.rawValues[MeasurementFieldKey.TERA.name])}",
+      "Asteen: ${DateFormatUtils.formatInches(measurement.bazu, measurement.rawValues[MeasurementFieldKey.BAZU.name])}",
+      "Gala: ${DateFormatUtils.formatInches(measurement.galaCollar, measurement.rawValues[MeasurementFieldKey.GALA_COLLAR.name])}",
+      "Seena: ${DateFormatUtils.formatInches(measurement.chati, measurement.rawValues[MeasurementFieldKey.CHATI.name])}",
+      "Ghera: ${DateFormatUtils.formatInches(measurement.gheraDaman, measurement.rawValues[MeasurementFieldKey.GHERA_DAMAN.name])}",
+      "Shalwar: ${DateFormatUtils.formatInches(measurement.shalwarLambai, measurement.rawValues[MeasurementFieldKey.SHALWAR_LAMBAI.name])}",
+      "Poncha: ${DateFormatUtils.formatInches(measurement.paincha, measurement.rawValues[MeasurementFieldKey.PAINCHA.name])}",
     )
   }
 
@@ -1594,15 +1641,41 @@ object ThermalReceiptFormatter {
     isUrdu: Boolean,
   ): List<String> = if (isUrdu) {
     buildList {
-      if (measurement.kamar > 0.0) add("کمر: ${formatUrduInches(measurement.kamar)}")
-      if (measurement.cuff > 0.0) add("کف: ${formatUrduInches(measurement.cuff)}")
-      if (measurement.gheraAsan > 0.0) add("آسن: ${formatUrduInches(measurement.gheraAsan)}")
+      val kamarRaw = measurement.rawValues[MeasurementFieldKey.KAMAR.name]
+      if (measurement.kamar > 0.0 || !kamarRaw.isNullOrBlank()) {
+        add("کمر: ${formatUrduInches(measurement.kamar, kamarRaw)}")
+      }
+      val cuffRaw = measurement.rawValues[MeasurementFieldKey.CUFF.name]
+      if (measurement.cuff > 0.0 || !cuffRaw.isNullOrBlank()) {
+        add("کف: ${formatUrduInches(measurement.cuff, cuffRaw)}")
+      }
+      val asanRaw = measurement.rawValues[MeasurementFieldKey.GHERA_ASAN.name]
+      if (measurement.gheraAsan > 0.0 || !asanRaw.isNullOrBlank()) {
+        add("آسن: ${formatUrduInches(measurement.gheraAsan, asanRaw)}")
+      }
+      val ghairRaw = measurement.rawValues[MeasurementFieldKey.SHALWAR_GHAIR.name]
+      if (measurement.shalwarGhair > 0.0 || !ghairRaw.isNullOrBlank()) {
+        add("شلوار گھیرا: ${formatUrduInches(measurement.shalwarGhair, ghairRaw)}")
+      }
     }
   } else {
     buildList {
-      if (measurement.kamar > 0.0) add("Kamar: ${DateFormatUtils.formatInches(measurement.kamar)}")
-      if (measurement.cuff > 0.0) add("Cuff: ${DateFormatUtils.formatInches(measurement.cuff)}")
-      if (measurement.gheraAsan > 0.0) add("Asan: ${DateFormatUtils.formatInches(measurement.gheraAsan)}")
+      val kamarRaw = measurement.rawValues[MeasurementFieldKey.KAMAR.name]
+      if (measurement.kamar > 0.0 || !kamarRaw.isNullOrBlank()) {
+        add("Kamar: ${DateFormatUtils.formatInches(measurement.kamar, kamarRaw)}")
+      }
+      val cuffRaw = measurement.rawValues[MeasurementFieldKey.CUFF.name]
+      if (measurement.cuff > 0.0 || !cuffRaw.isNullOrBlank()) {
+        add("Cuff: ${DateFormatUtils.formatInches(measurement.cuff, cuffRaw)}")
+      }
+      val asanRaw = measurement.rawValues[MeasurementFieldKey.GHERA_ASAN.name]
+      if (measurement.gheraAsan > 0.0 || !asanRaw.isNullOrBlank()) {
+        add("Asan: ${DateFormatUtils.formatInches(measurement.gheraAsan, asanRaw)}")
+      }
+      val ghairRaw = measurement.rawValues[MeasurementFieldKey.SHALWAR_GHAIR.name]
+      if (measurement.shalwarGhair > 0.0 || !ghairRaw.isNullOrBlank()) {
+        add("Shalwar Ghair: ${DateFormatUtils.formatInches(measurement.shalwarGhair, ghairRaw)}")
+      }
     }
   }
 
@@ -1618,6 +1691,7 @@ object ThermalReceiptFormatter {
         style.damanStyle?.let { add("دامن: ${damanStyleLabel(it, true)}") }
         if (pockets.isNotEmpty()) add("جیب: ${pocketStylesLabel(pockets, true)}")
         style.sleeveStyle?.let { add("آستین: ${sleeveStyleLabel(it, true)}") }
+        style.shalwarType?.let { add("شلوار: ${shalwarTypeLabel(it, true)}") }
         style.silaiStyle?.let { add("سلائی: ${silaiStyleLabel(it, true)}") }
       }
     } else {
@@ -1628,6 +1702,7 @@ object ThermalReceiptFormatter {
           add("${if (compact) "Pkts" else "Pockets"}: ${pocketStylesLabel(pockets, false, compact)}")
         }
         style.sleeveStyle?.let { add("${if (compact) "Slv" else "Sleeves"}: ${sleeveStyleLabel(it, false, compact)}") }
+        style.shalwarType?.let { add("Shalwar: ${shalwarTypeLabel(it, false)}") }
         style.silaiStyle?.let { add("Silai: ${silaiStyleLabel(it, false, compact)}") }
       }
     }
@@ -1676,16 +1751,28 @@ object ThermalReceiptFormatter {
   private fun sleeveStyleLabel(style: SleeveStyle, isUrdu: Boolean, compact: Boolean = false): String =
     if (!isUrdu) {
       if (!compact) style.displayName else when (style) {
+        SleeveStyle.KAF -> "Kaf"
+        SleeveStyle.KURTA -> "Kurta"
         SleeveStyle.PLAIN -> "Plain"
         SleeveStyle.SINGLE_CUFF -> "1-Cuff"
         SleeveStyle.DOUBLE_CUFF -> "2-Cuff"
         SleeveStyle.STUDS -> "Studs"
       }
     } else when (style) {
+      SleeveStyle.KAF -> "کف"
+      SleeveStyle.KURTA -> "کرتا"
       SleeveStyle.PLAIN -> "سادہ"
       SleeveStyle.SINGLE_CUFF -> "سنگل کف"
       SleeveStyle.DOUBLE_CUFF -> "ڈبل کف"
       SleeveStyle.STUDS -> "اسٹڈ"
+    }
+
+  private fun shalwarTypeLabel(style: ShalwarType, isUrdu: Boolean): String =
+    if (!isUrdu) style.displayName else when (style) {
+      ShalwarType.SMART -> "سمارٹ"
+      ShalwarType.NORMAL -> "نارمل"
+      ShalwarType.PANJAMA -> "پاجامہ"
+      ShalwarType.BALOCHI -> "بلوچی"
     }
 
   private fun silaiStyleLabel(style: SilaiStyle, isUrdu: Boolean, compact: Boolean = false): String =
@@ -1744,7 +1831,8 @@ object ThermalReceiptFormatter {
           '؟' -> append('?')
           in '\u0660'..'\u0669' -> append(('0'.code + (ch.code - '\u0660'.code)).toChar())
           in '\u06F0'..'\u06F9' -> append(('0'.code + (ch.code - '\u06F0'.code)).toChar())
-          '\u0640', '\u200C', '\u200D', '\u200E', '\u200F', '\uFEFF' -> Unit
+          '\u0640', '\u200C', '\u200D', '\u200E', '\u200F',
+          '\u2066', '\u2067', '\u2068', '\u2069', '\uFEFF' -> Unit
           else -> {
             val roman = urduCharToAscii(ch)
             if (roman != null) {
@@ -1786,5 +1874,21 @@ object ThermalReceiptFormatter {
     'ی', 'ي', 'ئ', 'ے', 'ۓ' -> "y"
     'ء' -> "'"
     else -> null
+  }
+
+  private fun isolateLtr(value: String, isRtl: Boolean): String =
+    if (isRtl && value.isNotBlank() && value.none(::isRtlChar)) {
+      "\u2066$value\u2069"
+    } else {
+      value
+    }
+
+  private fun isRtlChar(ch: Char): Boolean {
+    val dir = Character.getDirectionality(ch)
+    return dir == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
+      dir == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC ||
+      dir == Character.DIRECTIONALITY_RIGHT_TO_LEFT_EMBEDDING ||
+      dir == Character.DIRECTIONALITY_RIGHT_TO_LEFT_OVERRIDE ||
+      dir == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ISOLATE
   }
 }

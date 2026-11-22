@@ -217,7 +217,7 @@ fun OrderDetailContent(
             if (item.customerPhone.isNotBlank()) {
               Text(
                 text = item.customerPhone,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr),
                 color = mutedText,
               )
             }
@@ -1146,6 +1146,8 @@ private fun MeasurementTabSection(
         kamar = measurementSnapshot.kamar,
         cuff = measurementSnapshot.cuff,
         gheraAsan = measurementSnapshot.gheraAsan,
+        shalwarGhair = measurementSnapshot.shalwarGhair,
+        rawValues = measurementSnapshot.rawValues,
         dividerColor = dividerColor,
         valueColor = primaryText,
         mutedText = mutedText,
@@ -1158,6 +1160,7 @@ private fun MeasurementTabSection(
         pocketStyles = styleSnapshot.effectivePocketStyles(),
         sleeveStyle = styleSnapshot.sleeveStyle,
         silaiStyle = styleSnapshot.silaiStyle,
+        shalwarType = styleSnapshot.shalwarType,
         dividerColor = dividerColor,
         primaryText = primaryText,
         mutedText = mutedText,

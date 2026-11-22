@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -696,7 +697,7 @@ private fun CustomerDirectoryCard(
             )
             Text(
               text = customer.phone,
-              style = MaterialTheme.typography.bodyMedium,
+              style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr),
               fontWeight = FontWeight.Medium,
               color = OnAtelierOlive,
               maxLines = 1,

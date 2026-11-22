@@ -18,7 +18,8 @@ enum class MeasurementFieldKey(
   PAINCHA("meas_paincha", 4.0, 20.0, isRequired = true),
   KAMAR("meas_kamar", 14.0, 65.0, isRequired = false),
   CUFF("meas_cuff", 2.0, 15.0, isRequired = false),
-  GHERA_ASAN("meas_ghera_asan", 10.0, 35.0, isRequired = false);
+  GHERA_ASAN("meas_ghera_asan", 10.0, 60.0, isRequired = false),
+  SHALWAR_GHAIR("meas_shalwar_ghair", 20.0, 130.0, isRequired = false);
 
   fun label(urdu: Boolean): String = when (this) {
     KAMEEZ_LAMBAI -> if (urdu) "قمیض لمبائی" else "Kameez Lambai"
@@ -31,36 +32,79 @@ enum class MeasurementFieldKey(
     PAINCHA -> if (urdu) "پانچہ" else "Poncha"
     KAMAR -> if (urdu) "کمر" else "Kamar"
     CUFF -> if (urdu) "کف" else "Cuff"
-    GHERA_ASAN -> if (urdu) "گھیرا / آسن" else "Ghera / Asan"
+    GHERA_ASAN -> if (urdu) "آسن" else "Asan"
+    SHALWAR_GHAIR -> if (urdu) "شلوار گھیرا" else "Shalwar Ghair"
   }
 }
 
 object TailorValidators {
 
+  data class ParsedMeasurementDetails(
+    val primary: Double,
+    val secondary: Double? = null,
+    val isDualSlash: Boolean = false,
+  )
+
   private fun isUrdu(): Boolean = Locale.getDefault().language == "ur"
 
   private val wholeAndFractionRegex = Regex("^(\\d+(?:\\.\\d+)?)[\\s-]+(\\d+/\\d+)$")
+  private val dualSlashRegex = Regex("^(\\d+(?:\\.\\d+)?)/(\\d+(?:\\.\\d+)?)$")
+  private val commonKeypadFractions = setOf("1/4", "1/2", "3/4")
 
-  fun parseMeasurementInches(raw: String): Double? {
+  fun parseMeasurementDetails(raw: String): ParsedMeasurementDetails? {
     val trimmed = raw.trim()
     if (trimmed.isEmpty()) return null
 
     if (!trimmed.contains('/') && !trimmed.contains(' ') && !trimmed.contains('-')) {
       if (trimmed.endsWith('.')) return null
       val value = trimmed.toDoubleOrNull() ?: return null
-      return value.takeIf { it.isFinite() }
+      if (!value.isFinite()) return null
+      return ParsedMeasurementDetails(primary = value)
     }
 
     if (!trimmed.contains(' ') && !trimmed.contains('-') && trimmed.contains('/')) {
-      return parseFractionPart(trimmed)
+      if (trimmed in commonKeypadFractions) {
+        val frac = parseFractionPart(trimmed) ?: return null
+        return ParsedMeasurementDetails(primary = frac)
+      }
+      val dualMatch = dualSlashRegex.matchEntire(trimmed) ?: return null
+      val first = dualMatch.groupValues[1].toDoubleOrNull() ?: return null
+      val second = dualMatch.groupValues[2].toDoubleOrNull() ?: return null
+      if (!first.isFinite() || !second.isFinite() || second <= 0.0 || second > 200.0) {
+        return null
+      }
+      return ParsedMeasurementDetails(
+        primary = first,
+        secondary = second,
+        isDualSlash = true,
+      )
     }
 
     val match = wholeAndFractionRegex.matchEntire(trimmed) ?: return null
     val whole = match.groupValues[1].toDoubleOrNull() ?: return null
     val frac = parseFractionPart(match.groupValues[2]) ?: return null
     val sum = whole + frac
-    return sum.takeIf { it.isFinite() }
+    if (!sum.isFinite()) return null
+    return ParsedMeasurementDetails(primary = sum)
   }
+
+  fun parseMeasurementInches(raw: String): Double? =
+    parseMeasurementDetails(raw)?.primary
+
+  fun normalizeRawDualValue(raw: String): String? {
+    val trimmed = raw.trim()
+    val details = parseMeasurementDetails(trimmed) ?: return null
+    return if (details.isDualSlash) trimmed else null
+  }
+
+  fun buildRawValuesMap(entries: List<Pair<MeasurementFieldKey, String>>): Map<String, String> =
+    buildMap {
+      entries.forEach { (key, raw) ->
+        normalizeRawDualValue(raw)?.let { normalized ->
+          put(key.name, normalized)
+        }
+      }
+    }
 
   private fun parseFractionPart(part: String): Double? {
     val pieces = part.split('/')
@@ -91,18 +135,18 @@ object TailorValidators {
       return if (urdu) "$label درج کرنا لازمی ہے۔" else "$label is required."
     }
 
-    val parsed = parseMeasurementInches(trimmed)
+    val details = parseMeasurementDetails(trimmed)
       ?: return if (urdu) {
         "درست عدد درج کریں ($minStr–$maxStr انچ)۔"
       } else {
         "Enter valid value ($minStr–$maxStr in)."
       }
 
-    if (!key.isRequired && parsed == 0.0) {
+    if (!key.isRequired && !details.isDualSlash && details.primary == 0.0) {
       return null
     }
 
-    if (parsed < key.minInches || parsed > key.maxInches) {
+    if (details.primary < key.minInches || details.primary > key.maxInches) {
       return if (urdu) {
         "$label $minStr سے $maxStr انچ کے درمیان ہونا چاہیے۔"
       } else {
@@ -144,6 +188,7 @@ object TailorValidators {
       MeasurementFieldKey.KAMAR to snapshot.kamar,
       MeasurementFieldKey.CUFF to snapshot.cuff,
       MeasurementFieldKey.GHERA_ASAN to snapshot.gheraAsan,
+      MeasurementFieldKey.SHALWAR_GHAIR to snapshot.shalwarGhair,
     )
     for ((key, value) in fields) {
       if (value.isNaN() || value.isInfinite()) {

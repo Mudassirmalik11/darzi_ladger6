@@ -237,7 +237,9 @@ fun OrderSummaryCard(
               )
               Text(
                 text = item.customerPhone,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                  textDirection = androidx.compose.ui.text.style.TextDirection.Ltr,
+                ),
                 color = OnAtelierOlive.copy(alpha = 0.9f),
                 maxLines = 1,
               )

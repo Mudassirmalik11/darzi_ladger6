@@ -9,6 +9,7 @@ import com.example.core.model.PaymentMethod
 import com.example.core.model.PaymentStatus
 import com.example.core.model.PocketStyle
 import com.example.core.model.PocketStyleCodec
+import com.example.core.model.ShalwarType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.SyncEntityType
@@ -38,6 +39,10 @@ class DarziConverters {
   @TypeConverter fun fromSilaiStyle(value: SilaiStyle?): String? = value?.name
   @TypeConverter fun toSilaiStyle(value: String?): SilaiStyle? =
     value?.takeIf { it.isNotBlank() }?.let { raw -> SilaiStyle.entries.firstOrNull { it.name == raw } }
+
+  @TypeConverter fun fromShalwarType(value: ShalwarType?): String? = value?.name
+  @TypeConverter fun toShalwarType(value: String?): ShalwarType? =
+    value?.takeIf { it.isNotBlank() }?.let { raw -> ShalwarType.entries.firstOrNull { it.name == raw } }
 
   @TypeConverter fun fromOrderStatus(value: OrderStatus): String = value.name
   @TypeConverter fun toOrderStatus(value: String): OrderStatus = OrderStatus.valueOf(value)

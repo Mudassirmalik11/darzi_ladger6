@@ -111,12 +111,14 @@
     <string name="meas_cuff">کف</string>
     <string name="meas_shalwar_lambai">شلوار</string>
     <string name="meas_paincha">پانچہ</string>
-    <string name="meas_ghera_asan">گھیرا / آسن</string>
+    <string name="meas_ghera_asan">آسن</string>
+    <string name="meas_shalwar_ghair">شلوار گھیرا</string>
     <string name="style_neck">گلا</string>
     <string name="style_daman">دامن</string>
     <string name="style_pockets">جیبیں</string>
     <string name="style_sleeves">آستین</string>
     <string name="style_silai">سلائی</string>
+    <string name="style_shalwar">شلوار کی قسم</string>
     <string name="measurement_save">ناپ محفوظ کریں</string>
     <string name="measurement_saved_feedback">ناپ محفوظ ہو گیا</string>
     <string name="measurement_reuse_action">نئے طور پر استعمال کریں</string>
@@ -196,7 +198,7 @@
     <string name="settings_sign_out">سائن آؤٹ</string>
     <string name="role_owner_badge">دکان کا مالک</string>
     <string name="role_staff_badge">اسٹاف صارف</string>
-    <string name="settings_single_device_policy">پالیسی: فی صارف ایک وقت میں صرف 1 فعال ڈیوائس۔</string>
+    <string name="settings_single_device_policy">پالیسی: فی صارف ایک فعال ڈیوائس۔ نئی ڈیوائس پر سائن ان کرنے سے پہلی ڈیوائس خودکار لاگ آؤٹ ہو جاتی ہے۔</string>
     <string name="settings_shop_owner_only_hint">دکان کی تفصیلات صرف دکان کا مالک تبدیل کر سکتا ہے۔</string>
     <string name="settings_shop_users_section">دکان کے صارفین (زیادہ سے زیادہ 2)</string>
     <string name="settings_shop_users_count_pill">%2$d میں سے %1$d فعال</string>
@@ -434,6 +436,8 @@
     <string name="style_opt_pocket_two_side">ڈبل سائیڈ جیب</string>
     <string name="style_opt_pocket_shalwar">شلوار جیب</string>
     <string name="style_opt_pocket_none">کوئی جیب نہیں</string>
+    <string name="style_opt_sleeve_kaf">کف</string>
+    <string name="style_opt_sleeve_kurta">کرتا</string>
     <string name="style_opt_sleeve_plain">سادہ آستین</string>
     <string name="style_opt_sleeve_single_cuff">سنگل کف</string>
     <string name="style_opt_sleeve_double_cuff">ڈبل کف</string>
@@ -441,6 +445,10 @@
     <string name="style_opt_silai_single">سنگل سلائی</string>
     <string name="style_opt_silai_double">ڈبل سلائی</string>
     <string name="style_opt_silai_chamak">چمک دھاگہ</string>
+    <string name="style_opt_shalwar_smart">سمارٹ</string>
+    <string name="style_opt_shalwar_normal">نارمل</string>
+    <string name="style_opt_shalwar_panjama">پاجامہ</string>
+    <string name="style_opt_shalwar_balochi">بلوچی</string>
 
     <!-- Full Localization Coverage -->
     <string name="action_back">واپس</string>

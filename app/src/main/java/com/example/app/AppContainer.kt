@@ -47,6 +47,7 @@ class DefaultAppContainer(
   connectivityMonitorOverride: ConnectivityMonitor? = null,
   thermalPrinterClientOverride: ThermalPrinterClient? = null,
   shopPreferencesRepositoryOverride: ShopPreferencesRepository? = null,
+  shopCloudRepositoryOverride: ShopCloudRepository? = null,
 ) : AppContainer {
   override val database: DarziDatabase by lazy {
     DarziDatabase.getInstance(applicationContext)
@@ -91,7 +92,7 @@ class DefaultAppContainer(
   }
 
   override val shopCloudRepository: ShopCloudRepository by lazy {
-    ShopCloudRepository(
+    shopCloudRepositoryOverride ?: ShopCloudRepository(
       db = firestore,
       authSessionProvider = authSessionProvider,
       shopRepository = shopRepository,

@@ -159,11 +159,14 @@ service cloud.firestore {
              isValidInchValue(data.shalwarLambai) &&
              isValidInchValue(data.paincha) &&
              isValidOptionalInchValue(data.gheraAsan) &&
+             (!('shalwarGhair' in data) || isValidOptionalInchValue(data.shalwarGhair)) &&
              data.neckStyle in ['', 'COLLAR', 'BAN', 'HALF_BAN', 'ROUND'] &&
              data.damanStyle in ['', 'GOL', 'CHORASI'] &&
              isValidPocketStyle(data.pocketStyle) &&
-             data.sleeveStyle in ['', 'PLAIN', 'SINGLE_CUFF', 'DOUBLE_CUFF', 'STUDS'] &&
+             data.sleeveStyle in ['', 'KAF', 'KURTA', 'PLAIN', 'SINGLE_CUFF', 'DOUBLE_CUFF', 'STUDS'] &&
              data.silaiStyle in ['', 'SINGLE', 'DOUBLE', 'CHAMAK_DHAGA'] &&
+             (!('shalwarType' in data) || data.shalwarType in ['', 'SMART', 'NORMAL', 'PANJAMA', 'BALOCHI']) &&
+             (!('rawInputsJson' in data) || (data.rawInputsJson is string && data.rawInputsJson.size() <= 500)) &&
              data.notes is string && data.notes.size() <= 500 &&
              data.version is int && data.version >= 1 &&
              isValidId(data.lastModifiedByDevice) &&
@@ -182,7 +185,8 @@ service cloud.firestore {
              ]) &&
              snap.keys().hasOnly([
                'sourceMeasurementId', 'kameezLambai', 'tera', 'bazu', 'chati', 'kamar',
-               'gheraDaman', 'galaCollar', 'cuff', 'shalwarLambai', 'paincha', 'gheraAsan', 'notes'
+               'gheraDaman', 'galaCollar', 'cuff', 'shalwarLambai', 'paincha', 'gheraAsan',
+               'shalwarGhair', 'rawInputsJson', 'notes'
              ]) &&
              (!('sourceMeasurementId' in snap) || (snap.sourceMeasurementId is string && snap.sourceMeasurementId.size() <= 128)) &&
              isValidInchValue(snap.kameezLambai) &&
@@ -196,6 +200,8 @@ service cloud.firestore {
              isValidInchValue(snap.shalwarLambai) &&
              isValidInchValue(snap.paincha) &&
              isValidOptionalInchValue(snap.gheraAsan) &&
+             (!('shalwarGhair' in snap) || isValidOptionalInchValue(snap.shalwarGhair)) &&
+             (!('rawInputsJson' in snap) || (snap.rawInputsJson is string && snap.rawInputsJson.size() <= 500)) &&
              snap.notes is string && snap.notes.size() <= 500;
     }
 
@@ -208,12 +214,13 @@ service cloud.firestore {
     function isValidStyleSnapshot(snap) {
       return snap is map &&
              snap.keys().hasAll(['neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle']) &&
-             snap.keys().hasOnly(['neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle']) &&
+             snap.keys().hasOnly(['neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle', 'shalwarType']) &&
              snap.neckStyle in ['', 'COLLAR', 'BAN', 'HALF_BAN', 'ROUND'] &&
              snap.damanStyle in ['', 'GOL', 'CHORASI'] &&
              isValidPocketStyle(snap.pocketStyle) &&
-             snap.sleeveStyle in ['', 'PLAIN', 'SINGLE_CUFF', 'DOUBLE_CUFF', 'STUDS'] &&
-             snap.silaiStyle in ['', 'SINGLE', 'DOUBLE', 'CHAMAK_DHAGA'];
+             snap.sleeveStyle in ['', 'KAF', 'KURTA', 'PLAIN', 'SINGLE_CUFF', 'DOUBLE_CUFF', 'STUDS'] &&
+             snap.silaiStyle in ['', 'SINGLE', 'DOUBLE', 'CHAMAK_DHAGA'] &&
+             (!('shalwarType' in snap) || snap.shalwarType in ['', 'SMART', 'NORMAL', 'PANJAMA', 'BALOCHI']);
     }
 
     function isValidOrder(data, userId) {
@@ -399,7 +406,11 @@ service cloud.firestore {
                            'deviceName', 'deviceRole', 'status', 'appVersion', 'lastSeenAt', 'updatedAt'
                          ]);
 
-        allow delete: if false;
+        allow delete: if isValidId(deviceId) &&
+                         (
+                           isShopOwner(userId) ||
+                           (isActiveStaff(userId) && resource != null && resource.data.userUid == request.auth.uid)
+                         );
       }
 
       match /order_reservations/{reservationId} {
@@ -474,9 +485,9 @@ service cloud.firestore {
                          incoming().keys().hasOnly([
                            'ownerUid', 'customerId', 'label', 'currentFlag',
                            'kameezLambai', 'tera', 'bazu', 'chati', 'kamar', 'gheraDaman',
-                           'galaCollar', 'cuff', 'shalwarLambai', 'paincha', 'gheraAsan',
-                           'neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle',
-                           'notes', 'version', 'lastModifiedByDevice', 'deleted',
+                           'galaCollar', 'cuff', 'shalwarLambai', 'paincha', 'gheraAsan', 'shalwarGhair',
+                           'neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle', 'shalwarType',
+                           'rawInputsJson', 'notes', 'version', 'lastModifiedByDevice', 'deleted',
                            'createdAtEpochMillis', 'updatedAtEpochMillis', 'createdAt', 'updatedAt'
                          ]) &&
                          isValidMeasurement(incoming(), userId) &&
@@ -494,9 +505,9 @@ service cloud.firestore {
                          incoming().diff(existing()).affectedKeys().hasOnly([
                            'label', 'currentFlag',
                            'kameezLambai', 'tera', 'bazu', 'chati', 'kamar', 'gheraDaman',
-                           'galaCollar', 'cuff', 'shalwarLambai', 'paincha', 'gheraAsan',
-                           'neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle',
-                           'notes', 'version', 'lastModifiedByDevice', 'deleted',
+                           'galaCollar', 'cuff', 'shalwarLambai', 'paincha', 'gheraAsan', 'shalwarGhair',
+                           'neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle', 'shalwarType',
+                           'rawInputsJson', 'notes', 'version', 'lastModifiedByDevice', 'deleted',
                            'updatedAtEpochMillis', 'updatedAt'
                          ]);
 

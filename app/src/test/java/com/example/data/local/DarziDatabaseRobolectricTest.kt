@@ -12,6 +12,7 @@ import com.example.core.model.OrderStatus
 import com.example.core.model.PaymentMethod
 import com.example.core.model.PaymentStatus
 import com.example.core.model.PocketStyle
+import com.example.core.model.ShalwarType
 import com.example.core.model.ShopUserRole
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
@@ -62,6 +63,8 @@ class DarziDatabaseRobolectricTest {
     shalwarLambai = 40.0,
     paincha = 7.5,
     gheraAsan = 16.5,
+    shalwarGhair = 88.0,
+    rawValues = mapOf("BAZU" to "23/12"),
     notes = "Loose fitting sleeves",
   )
 
@@ -69,8 +72,9 @@ class DarziDatabaseRobolectricTest {
     neckStyle = NeckStyle.BAN,
     damanStyle = DamanStyle.GOL,
     pocketStyle = PocketStyle.TWO_SIDE,
-    sleeveStyle = SleeveStyle.SINGLE_CUFF,
+    sleeveStyle = SleeveStyle.KAF,
     silaiStyle = SilaiStyle.DOUBLE,
+    shalwarType = ShalwarType.BALOCHI,
   )
 
   @Before
@@ -145,9 +149,13 @@ class DarziDatabaseRobolectricTest {
       pocketStyle = sampleStyle.pocketStyle,
       sleeveStyle = sampleStyle.sleeveStyle,
       silaiStyle = sampleStyle.silaiStyle,
+      shalwarType = sampleStyle.shalwarType,
       deviceId = "phone-1",
       nowMillis = 1000L,
     ).getOrThrow()
+    assertEquals(88.0, m1.shalwarGhair, 0.001)
+    assertEquals(ShalwarType.BALOCHI, m1.shalwarType)
+    assertEquals(mapOf("BAZU" to "23/12"), m1.rawInputsMap())
 
     deviceSyncRepo.addOrderNumberReservation(
       deviceId = "phone-1",
@@ -359,6 +367,7 @@ class DarziDatabaseRobolectricTest {
         DarziDatabase.MIGRATION_2_3,
         DarziDatabase.MIGRATION_3_4,
         DarziDatabase.MIGRATION_4_5,
+        DarziDatabase.MIGRATION_5_6,
       )
       .allowMainThreadQueries()
       .build()
@@ -390,12 +399,16 @@ class DarziDatabaseRobolectricTest {
         pocketStyles = emptySet(),
         sleeveStyle = null,
         silaiStyle = null,
+        shalwarType = null,
         deviceId = device.deviceId,
       ).getOrThrow()
       assertNull(savedMeas.neckStyle)
       assertNull(savedMeas.damanStyle)
       assertNull(savedMeas.sleeveStyle)
       assertNull(savedMeas.silaiStyle)
+      assertNull(savedMeas.shalwarType)
+      assertEquals(88.0, savedMeas.shalwarGhair, 0.001)
+      assertEquals(mapOf("BAZU" to "23/12"), savedMeas.rawInputsMap())
     }
     migratedDb.close()
     dbFile.delete()

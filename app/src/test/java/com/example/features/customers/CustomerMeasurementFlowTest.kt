@@ -483,13 +483,15 @@ class CustomerMeasurementFlowTest {
     composeTestRule.onNodeWithTag("keypad_key_1").performClick()
     composeTestRule.onNodeWithTag("keypad_key_8").performClick()
 
-    // Field 3: Asteen (24 1/4)
+    // Field 3: Asteen (23/12 via keypad '/' button)
     composeTestRule.onNodeWithTag("keypad_key_next").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("meas_bazu").assertIsFocused()
     composeTestRule.onNodeWithTag("keypad_key_2").performClick()
-    composeTestRule.onNodeWithTag("keypad_key_4").performClick()
-    composeTestRule.onNodeWithTag("keypad_key_quarter").performClick()
+    composeTestRule.onNodeWithTag("keypad_key_3").performClick()
+    composeTestRule.onNodeWithTag("keypad_key_symbol").performClick()
+    composeTestRule.onNodeWithTag("keypad_key_1").performClick()
+    composeTestRule.onNodeWithTag("keypad_key_2").performClick()
 
     // Field 4: Gala (16.5)
     composeTestRule.onNodeWithTag("keypad_key_next").performClick()
@@ -530,7 +532,7 @@ class CustomerMeasurementFlowTest {
     composeTestRule.onNodeWithTag("keypad_key_dot_slash").performClick()
     composeTestRule.onNodeWithTag("keypad_key_5").performClick()
 
-    // Dismiss keypad, leave optional fields (Kamar, Cuff, Ghera/Asan) blank, and save
+    // Dismiss keypad, leave optional fields (Kamar, Cuff, Asan, Shalwar Ghair) blank, and save
     composeTestRule.onNodeWithTag("keypad_hide_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("meas_save_button").performScrollTo().performClick()
@@ -541,10 +543,13 @@ class CustomerMeasurementFlowTest {
     composeTestRule.onNodeWithTag("customer_detail_content")
       .performScrollToNode(androidx.compose.ui.test.hasText("41.5\""))
     composeTestRule.onAllNodesWithText("41.5\"").onFirst().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("customer_detail_content")
+      .performScrollToNode(androidx.compose.ui.test.hasText("23/12\""))
+    composeTestRule.onAllNodesWithText("23/12\"").onFirst().assertIsDisplayed()
   }
 
   @Test
-  fun `saved measurements keep 1 to 8 order, place optional Kamar below Poncha, omit blanks, and default zero styles`() {
+  fun `saved measurements keep 1 to 8 order, place optional Kamar and Shalwar Ghair below Poncha, omit blanks, and default zero styles`() {
     val app = ApplicationProvider.getApplicationContext<TailorApp>()
     val customerId: String
     runBlocking {
@@ -576,7 +581,8 @@ class CustomerMeasurementFlowTest {
       "style_neck_collar", "style_neck_ban", "style_neck_half_ban", "style_neck_round",
       "style_daman_gol", "style_daman_chorasi",
       "style_pocket_front", "style_pocket_one_side", "style_pocket_two_side", "style_pocket_shalwar_pocket",
-      "style_sleeve_plain", "style_sleeve_single_cuff", "style_sleeve_double_cuff", "style_sleeve_studs",
+      "style_sleeve_kaf", "style_sleeve_kurta",
+      "style_shalwar_smart", "style_shalwar_normal", "style_shalwar_panjama", "style_shalwar_balochi",
       "style_silai_single", "style_silai_double", "style_silai_chamak_dhaga",
     ).forEach { tag ->
       composeTestRule.onNodeWithTag(tag).performScrollTo().assertIsNotSelected()
@@ -588,11 +594,15 @@ class CustomerMeasurementFlowTest {
     composeTestRule.onNodeWithTag("style_neck_collar").performClick()
     composeTestRule.onNodeWithTag("style_neck_collar").assertIsNotSelected()
 
-    // Choose only Collar style; leave Daman, Pockets, Sleeves, Silai unselected
+    // Choose Collar, Kaf sleeve, and Balochi shalwar; leave Daman, Pockets, Silai unselected
     composeTestRule.onNodeWithTag("style_neck_collar").performClick()
     composeTestRule.onNodeWithTag("style_neck_collar").assertIsSelected()
+    composeTestRule.onNodeWithTag("style_sleeve_kaf").performScrollTo().performClick()
+    composeTestRule.onNodeWithTag("style_sleeve_kaf").assertIsSelected()
+    composeTestRule.onNodeWithTag("style_shalwar_balochi").performScrollTo().performClick()
+    composeTestRule.onNodeWithTag("style_shalwar_balochi").assertIsSelected()
 
-    // Fill only the 8 compulsory measurements; leave optional Kamar, Cuff, Ghera Asan blank
+    // Fill only the 8 compulsory measurements; leave optional Kamar, Cuff, Asan, Shalwar Ghair blank
     composeTestRule.onNodeWithTag("meas_kameez_lambai").performScrollTo().performTextInput("40")
     composeTestRule.onNodeWithTag("meas_tera").performScrollTo().performTextInput("17.5")
     composeTestRule.onNodeWithTag("meas_bazu").performScrollTo().performTextInput("24")
@@ -639,22 +649,25 @@ class CustomerMeasurementFlowTest {
     assert(composeTestRule.onAllNodesWithTag("saved_meas_kamar").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithTag("saved_meas_cuff").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithTag("saved_meas_ghera_asan").fetchSemanticsNodes().isEmpty())
+    assert(composeTestRule.onAllNodesWithTag("saved_meas_shalwar_ghair").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithText("—").fetchSemanticsNodes().isEmpty())
 
-    // Only chosen Neck style appears; unselected defaults must NOT appear
+    // Only chosen Neck, Sleeves (Kaf), and Shalwar Type (Balochi) appear; unselected defaults must NOT appear
     composeTestRule.onNodeWithTag("customer_detail_content")
       .performScrollToNode(hasTestTag("saved_style_neck"))
     composeTestRule.onNodeWithTag("saved_style_neck").performScrollTo().assertIsDisplayed()
     composeTestRule.onAllNodesWithText("Collar").onFirst().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("saved_style_sleeves").performScrollTo().assertIsDisplayed()
+    composeTestRule.onAllNodesWithText("Kaf").onFirst().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("saved_style_shalwar").performScrollTo().assertIsDisplayed()
+    composeTestRule.onAllNodesWithText("Balochi").onFirst().assertIsDisplayed()
     assert(composeTestRule.onAllNodesWithTag("saved_style_daman").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithTag("saved_style_pockets").fetchSemanticsNodes().isEmpty())
-    assert(composeTestRule.onAllNodesWithTag("saved_style_sleeves").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithTag("saved_style_silai").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithText("Gol Daman").fetchSemanticsNodes().isEmpty())
-    assert(composeTestRule.onAllNodesWithText("Plain Sleeves").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithText("Single Silai").fetchSemanticsNodes().isEmpty())
 
-    // Edit measurement to enter optional Kamar -> must appear below Poncha
+    // Edit measurement to enter optional Kamar + Shalwar Ghair -> must appear below Poncha
     val measId = runBlocking {
       app.container.customerRepository.getCurrentMeasurement(customerId)!!.measurementId
     }
@@ -667,6 +680,7 @@ class CustomerMeasurementFlowTest {
       composeTestRule.onAllNodesWithTag("meas_kamar").fetchSemanticsNodes().isNotEmpty()
     }
     composeTestRule.onNodeWithTag("meas_kamar").performScrollTo().performTextInput("36")
+    composeTestRule.onNodeWithTag("meas_shalwar_ghair").performScrollTo().performTextInput("95")
     composeTestRule.onNodeWithTag("keypad_hide_button").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("meas_save_button").performScrollTo().performClick()
@@ -677,6 +691,9 @@ class CustomerMeasurementFlowTest {
     composeTestRule.onNodeWithTag("customer_detail_content")
       .performScrollToNode(hasTestTag("saved_meas_kamar"))
     composeTestRule.onNodeWithTag("saved_meas_kamar").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("customer_detail_content")
+      .performScrollToNode(hasTestTag("saved_meas_shalwar_ghair"))
+    composeTestRule.onNodeWithTag("saved_meas_shalwar_ghair").performScrollTo().assertIsDisplayed()
     val ponchaBottom = composeTestRule.onNodeWithTag("saved_meas_paincha").getBoundsInRoot().bottom
     val kamarTop = composeTestRule.onNodeWithTag("saved_meas_kamar").getBoundsInRoot().top
     assert(kamarTop >= ponchaBottom)

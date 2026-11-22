@@ -111,12 +111,14 @@
     <string name="meas_cuff">Cuff</string>
     <string name="meas_shalwar_lambai">Shalwar</string>
     <string name="meas_paincha">Poncha</string>
-    <string name="meas_ghera_asan">Ghera / Asan</string>
+    <string name="meas_ghera_asan">Asan</string>
+    <string name="meas_shalwar_ghair">Shalwar Ghair</string>
     <string name="style_neck">Neck</string>
     <string name="style_daman">Daman</string>
     <string name="style_pockets">Pockets</string>
     <string name="style_sleeves">Sleeves</string>
     <string name="style_silai">Silai</string>
+    <string name="style_shalwar">Shalwar Type</string>
     <string name="measurement_save">Save Measurements</string>
     <string name="measurement_saved_feedback">Measurements saved to history</string>
     <string name="measurement_reuse_action">Reuse as New</string>
@@ -196,7 +198,7 @@
     <string name="settings_sign_out">Sign Out</string>
     <string name="role_owner_badge">Shop Owner</string>
     <string name="role_staff_badge">Staff User</string>
-    <string name="settings_single_device_policy">Policy: 1 active device per user at a time.</string>
+    <string name="settings_single_device_policy">Policy: 1 active device per user. Signing in on another device automatically signs out the previous one.</string>
     <string name="settings_shop_owner_only_hint">Only the shop owner can update shop profile details.</string>
     <string name="settings_shop_users_section">Shop Users (Max 2)</string>
     <string name="settings_shop_users_count_pill">%1$d of %2$d Active</string>
@@ -434,6 +436,8 @@
     <string name="style_opt_pocket_two_side">Double Side Pocket</string>
     <string name="style_opt_pocket_shalwar">Shalwar Pocket</string>
     <string name="style_opt_pocket_none">No Pocket</string>
+    <string name="style_opt_sleeve_kaf">Kaf</string>
+    <string name="style_opt_sleeve_kurta">Kurta</string>
     <string name="style_opt_sleeve_plain">Plain Sleeves</string>
     <string name="style_opt_sleeve_single_cuff">Single Cuff</string>
     <string name="style_opt_sleeve_double_cuff">Double Cuff</string>
@@ -441,6 +445,10 @@
     <string name="style_opt_silai_single">Single Silai</string>
     <string name="style_opt_silai_double">Double Silai</string>
     <string name="style_opt_silai_chamak">Chamak Dhaga</string>
+    <string name="style_opt_shalwar_smart">Smart</string>
+    <string name="style_opt_shalwar_normal">Normal</string>
+    <string name="style_opt_shalwar_panjama">Panjama</string>
+    <string name="style_opt_shalwar_balochi">Balochi</string>
 
     <!-- Full Localization Coverage -->
     <string name="action_back">Back</string>

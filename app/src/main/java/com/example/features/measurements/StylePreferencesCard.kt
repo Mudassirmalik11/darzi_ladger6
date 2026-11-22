@@ -19,12 +19,14 @@ import com.example.R
 import com.example.core.model.DamanStyle
 import com.example.core.model.NeckStyle
 import com.example.core.model.PocketStyle
+import com.example.core.model.ShalwarType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.ui.AtelierCard
 import com.example.features.customers.localizedDamanStyle
 import com.example.features.customers.localizedNeckStyle
 import com.example.features.customers.localizedPocketStyle
+import com.example.features.customers.localizedShalwarType
 import com.example.features.customers.localizedSilaiStyle
 import com.example.features.customers.localizedSleeveStyle
 
@@ -40,6 +42,8 @@ fun StylePreferencesCard(
   onSelectSleeveStyle: (SleeveStyle?) -> Unit,
   silaiStyle: SilaiStyle?,
   onSelectSilaiStyle: (SilaiStyle?) -> Unit,
+  shalwarType: ShalwarType? = null,
+  onSelectShalwarType: (ShalwarType?) -> Unit = {},
   modifier: Modifier = Modifier,
   footerContent: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
@@ -83,11 +87,20 @@ fun StylePreferencesCard(
 
       SingleStyleChipGroup(
         title = stringResource(R.string.style_sleeves),
-        options = SleeveStyle.entries,
+        options = SleeveStyle.selectableEntries,
         selected = sleeveStyle,
         labelFor = { localizedSleeveStyle(it) },
         tagPrefix = "style_sleeve",
         onSelect = onSelectSleeveStyle,
+      )
+
+      SingleStyleChipGroup(
+        title = stringResource(R.string.style_shalwar),
+        options = ShalwarType.entries,
+        selected = shalwarType,
+        labelFor = { localizedShalwarType(it) },
+        tagPrefix = "style_shalwar",
+        onSelect = onSelectShalwarType,
       )
 
       SingleStyleChipGroup(

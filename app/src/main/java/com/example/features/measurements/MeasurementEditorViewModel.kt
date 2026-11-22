@@ -8,6 +8,7 @@ import com.example.core.model.MeasurementFieldKey
 import com.example.core.model.MeasurementSnapshot
 import com.example.core.model.NeckStyle
 import com.example.core.model.PocketStyle
+import com.example.core.model.ShalwarType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.TailorValidators
@@ -35,11 +36,13 @@ data class MeasurementFormState(
   val shalwarLambai: String = "",
   val paincha: String = "",
   val gheraAsan: String = "",
+  val shalwarGhair: String = "",
   val neckStyle: NeckStyle? = null,
   val damanStyle: DamanStyle? = null,
   val pocketStyles: Set<PocketStyle> = emptySet(),
   val sleeveStyle: SleeveStyle? = null,
   val silaiStyle: SilaiStyle? = null,
+  val shalwarType: ShalwarType? = null,
   val notes: String = "",
   val isLoaded: Boolean = false,
   val isSaving: Boolean = false,
@@ -58,6 +61,7 @@ data class MeasurementFormState(
     MeasurementFieldKey.KAMAR -> kamar
     MeasurementFieldKey.CUFF -> cuff
     MeasurementFieldKey.GHERA_ASAN -> gheraAsan
+    MeasurementFieldKey.SHALWAR_GHAIR -> shalwarGhair
   }
 
   fun errorFor(key: MeasurementFieldKey): String? =
@@ -87,6 +91,7 @@ class MeasurementEditorViewModel(
       val seed = existing ?: customerRepository.getCurrentMeasurement(customerId)
       _formState.update { state ->
         if (seed != null) {
+          val rawMap = seed.rawInputsMap()
           state.copy(
             customerName = customer?.name ?: "",
             label = if (seed.label.equals("Standard", ignoreCase = true)) {
@@ -94,22 +99,24 @@ class MeasurementEditorViewModel(
             } else {
               seed.label
             },
-            kameezLambai = formatNumeric(seed.kameezLambai),
-            tera = formatNumeric(seed.tera),
-            bazu = formatNumeric(seed.bazu),
-            chati = formatNumeric(seed.chati),
-            kamar = formatOptionalNumeric(seed.kamar),
-            gheraDaman = formatNumeric(seed.gheraDaman),
-            galaCollar = formatNumeric(seed.galaCollar),
-            cuff = formatOptionalNumeric(seed.cuff),
-            shalwarLambai = formatNumeric(seed.shalwarLambai),
-            paincha = formatNumeric(seed.paincha),
-            gheraAsan = formatOptionalNumeric(seed.gheraAsan),
+            kameezLambai = initialFieldText(rawMap, MeasurementFieldKey.KAMEEZ_LAMBAI, seed.kameezLambai),
+            tera = initialFieldText(rawMap, MeasurementFieldKey.TERA, seed.tera),
+            bazu = initialFieldText(rawMap, MeasurementFieldKey.BAZU, seed.bazu),
+            chati = initialFieldText(rawMap, MeasurementFieldKey.CHATI, seed.chati),
+            kamar = initialFieldText(rawMap, MeasurementFieldKey.KAMAR, seed.kamar),
+            gheraDaman = initialFieldText(rawMap, MeasurementFieldKey.GHERA_DAMAN, seed.gheraDaman),
+            galaCollar = initialFieldText(rawMap, MeasurementFieldKey.GALA_COLLAR, seed.galaCollar),
+            cuff = initialFieldText(rawMap, MeasurementFieldKey.CUFF, seed.cuff),
+            shalwarLambai = initialFieldText(rawMap, MeasurementFieldKey.SHALWAR_LAMBAI, seed.shalwarLambai),
+            paincha = initialFieldText(rawMap, MeasurementFieldKey.PAINCHA, seed.paincha),
+            gheraAsan = initialFieldText(rawMap, MeasurementFieldKey.GHERA_ASAN, seed.gheraAsan),
+            shalwarGhair = initialFieldText(rawMap, MeasurementFieldKey.SHALWAR_GHAIR, seed.shalwarGhair),
             neckStyle = seed.neckStyle,
             damanStyle = seed.damanStyle,
             pocketStyles = seed.pocketStyles,
             sleeveStyle = seed.sleeveStyle,
             silaiStyle = seed.silaiStyle,
+            shalwarType = seed.shalwarType,
             notes = seed.notes,
             isLoaded = true,
           )
@@ -124,6 +131,7 @@ class MeasurementEditorViewModel(
   }
 
   fun loadFromMeasurement(measurement: MeasurementEntity) {
+    val rawMap = measurement.rawInputsMap()
     _formState.update { state ->
       state.copy(
         label = if (measurement.label.equals("Standard", ignoreCase = true)) {
@@ -131,22 +139,24 @@ class MeasurementEditorViewModel(
         } else {
           measurement.label
         },
-        kameezLambai = formatNumeric(measurement.kameezLambai),
-        tera = formatNumeric(measurement.tera),
-        bazu = formatNumeric(measurement.bazu),
-        chati = formatNumeric(measurement.chati),
-        kamar = formatOptionalNumeric(measurement.kamar),
-        gheraDaman = formatNumeric(measurement.gheraDaman),
-        galaCollar = formatNumeric(measurement.galaCollar),
-        cuff = formatOptionalNumeric(measurement.cuff),
-        shalwarLambai = formatNumeric(measurement.shalwarLambai),
-        paincha = formatNumeric(measurement.paincha),
-        gheraAsan = formatOptionalNumeric(measurement.gheraAsan),
+        kameezLambai = initialFieldText(rawMap, MeasurementFieldKey.KAMEEZ_LAMBAI, measurement.kameezLambai),
+        tera = initialFieldText(rawMap, MeasurementFieldKey.TERA, measurement.tera),
+        bazu = initialFieldText(rawMap, MeasurementFieldKey.BAZU, measurement.bazu),
+        chati = initialFieldText(rawMap, MeasurementFieldKey.CHATI, measurement.chati),
+        kamar = initialFieldText(rawMap, MeasurementFieldKey.KAMAR, measurement.kamar),
+        gheraDaman = initialFieldText(rawMap, MeasurementFieldKey.GHERA_DAMAN, measurement.gheraDaman),
+        galaCollar = initialFieldText(rawMap, MeasurementFieldKey.GALA_COLLAR, measurement.galaCollar),
+        cuff = initialFieldText(rawMap, MeasurementFieldKey.CUFF, measurement.cuff),
+        shalwarLambai = initialFieldText(rawMap, MeasurementFieldKey.SHALWAR_LAMBAI, measurement.shalwarLambai),
+        paincha = initialFieldText(rawMap, MeasurementFieldKey.PAINCHA, measurement.paincha),
+        gheraAsan = initialFieldText(rawMap, MeasurementFieldKey.GHERA_ASAN, measurement.gheraAsan),
+        shalwarGhair = initialFieldText(rawMap, MeasurementFieldKey.SHALWAR_GHAIR, measurement.shalwarGhair),
         neckStyle = measurement.neckStyle,
         damanStyle = measurement.damanStyle,
         pocketStyles = measurement.pocketStyles,
         sleeveStyle = measurement.sleeveStyle,
         silaiStyle = measurement.silaiStyle,
+        shalwarType = measurement.shalwarType,
         notes = measurement.notes,
         hasAttemptedSave = false,
         errorMessage = null,
@@ -172,6 +182,7 @@ class MeasurementEditorViewModel(
         MeasurementFieldKey.KAMAR -> state.copy(kamar = rawText)
         MeasurementFieldKey.CUFF -> state.copy(cuff = rawText)
         MeasurementFieldKey.GHERA_ASAN -> state.copy(gheraAsan = rawText)
+        MeasurementFieldKey.SHALWAR_GHAIR -> state.copy(shalwarGhair = rawText)
       }
     }
   }
@@ -190,6 +201,10 @@ class MeasurementEditorViewModel(
         return setError(fieldErr)
       }
     }
+
+    val rawValues = TailorValidators.buildRawValuesMap(
+      MeasurementFieldKey.entries.map { it to s.valueFor(it) },
+    )
 
     val snapshot = MeasurementSnapshot(
       kameezLambai = TailorValidators.parseMeasurementInches(s.kameezLambai)
@@ -224,8 +239,15 @@ class MeasurementEditorViewModel(
         0.0
       } else {
         TailorValidators.parseMeasurementInches(s.gheraAsan)
-          ?: return setError(localizedAppText("Enter valid Ghera / Asan (inches).", "درست گھیرا / آسن (انچ) درج کریں۔"))
+          ?: return setError(localizedAppText("Enter valid Asan (inches).", "درست آسن (انچ) درج کریں۔"))
       },
+      shalwarGhair = if (s.shalwarGhair.isBlank()) {
+        0.0
+      } else {
+        TailorValidators.parseMeasurementInches(s.shalwarGhair)
+          ?: return setError(localizedAppText("Enter valid Shalwar Ghair (inches).", "درست شلوار گھیرا (انچ) درج کریں۔"))
+      },
+      rawValues = rawValues,
       notes = s.notes,
     )
 
@@ -246,6 +268,7 @@ class MeasurementEditorViewModel(
           pocketStyles = s.pocketStyles,
           sleeveStyle = s.sleeveStyle,
           silaiStyle = s.silaiStyle,
+          shalwarType = s.shalwarType,
           label = persistLabel,
           deviceId = device.deviceId,
         )
@@ -258,6 +281,7 @@ class MeasurementEditorViewModel(
           pocketStyles = s.pocketStyles,
           sleeveStyle = s.sleeveStyle,
           silaiStyle = s.silaiStyle,
+          shalwarType = s.shalwarType,
           label = persistLabel,
           deviceId = device.deviceId,
         )
@@ -282,6 +306,16 @@ class MeasurementEditorViewModel(
 
   private fun setError(message: String) {
     _formState.update { it.copy(errorMessage = message) }
+  }
+
+  private fun initialFieldText(
+    rawMap: Map<String, String>,
+    key: MeasurementFieldKey,
+    numericValue: Double,
+  ): String {
+    val raw = rawMap[key.name]?.trim()
+    if (!raw.isNullOrEmpty()) return raw
+    return if (key.isRequired) formatNumeric(numericValue) else formatOptionalNumeric(numericValue)
   }
 
   private fun formatNumeric(value: Double): String {

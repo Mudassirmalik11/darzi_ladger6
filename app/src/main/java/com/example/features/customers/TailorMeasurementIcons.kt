@@ -34,6 +34,7 @@ import com.example.R
 import com.example.core.model.DamanStyle
 import com.example.core.model.NeckStyle
 import com.example.core.model.PocketStyle
+import com.example.core.model.ShalwarType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.ui.theme.JetBrainsMonoFamily
@@ -470,6 +471,8 @@ fun localizedPocketStyles(styles: Collection<PocketStyle>): String {
 
 @Composable
 fun localizedSleeveStyle(style: SleeveStyle): String = when (style) {
+  SleeveStyle.KAF -> stringResource(R.string.style_opt_sleeve_kaf)
+  SleeveStyle.KURTA -> stringResource(R.string.style_opt_sleeve_kurta)
   SleeveStyle.PLAIN -> stringResource(R.string.style_opt_sleeve_plain)
   SleeveStyle.SINGLE_CUFF -> stringResource(R.string.style_opt_sleeve_single_cuff)
   SleeveStyle.DOUBLE_CUFF -> stringResource(R.string.style_opt_sleeve_double_cuff)
@@ -481,6 +484,14 @@ fun localizedSilaiStyle(style: SilaiStyle): String = when (style) {
   SilaiStyle.SINGLE -> stringResource(R.string.style_opt_silai_single)
   SilaiStyle.DOUBLE -> stringResource(R.string.style_opt_silai_double)
   SilaiStyle.CHAMAK_DHAGA -> stringResource(R.string.style_opt_silai_chamak)
+}
+
+@Composable
+fun localizedShalwarType(style: ShalwarType): String = when (style) {
+  ShalwarType.SMART -> stringResource(R.string.style_opt_shalwar_smart)
+  ShalwarType.NORMAL -> stringResource(R.string.style_opt_shalwar_normal)
+  ShalwarType.PANJAMA -> stringResource(R.string.style_opt_shalwar_panjama)
+  ShalwarType.BALOCHI -> stringResource(R.string.style_opt_shalwar_balochi)
 }
 
 @Composable

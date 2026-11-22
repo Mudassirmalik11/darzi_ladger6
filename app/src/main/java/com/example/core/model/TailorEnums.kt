@@ -63,10 +63,24 @@ object PocketStyleSetSerializer : kotlinx.serialization.KSerializer<Set<PocketSt
 
 @Serializable
 enum class SleeveStyle(val displayName: String) {
+  KAF("Kaf"),
+  KURTA("Kurta"),
   PLAIN("Plain"),
   SINGLE_CUFF("Single Cuff"),
   DOUBLE_CUFF("Double Cuff"),
-  STUDS("Studs"),
+  STUDS("Studs");
+
+  companion object {
+    val selectableEntries: List<SleeveStyle> = listOf(KAF, KURTA)
+  }
+}
+
+@Serializable
+enum class ShalwarType(val displayName: String) {
+  SMART("Smart"),
+  NORMAL("Normal"),
+  PANJAMA("Panjama"),
+  BALOCHI("Balochi"),
 }
 
 @Serializable

@@ -192,6 +192,7 @@ fun CustomerDetailContent(
               icon = Icons.Outlined.Phone,
               text = customer.phone,
               textColor = mutedText,
+              textDirection = TextDirection.Ltr,
             )
           }
 
@@ -592,6 +593,7 @@ private fun CustomerMetaRow(
   icon: androidx.compose.ui.graphics.vector.ImageVector,
   text: String,
   textColor: Color,
+  textDirection: TextDirection? = null,
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
@@ -605,7 +607,11 @@ private fun CustomerMetaRow(
     )
     Text(
       text = text,
-      style = MaterialTheme.typography.bodyLarge,
+      style = if (textDirection != null) {
+        MaterialTheme.typography.bodyLarge.copy(textDirection = textDirection)
+      } else {
+        MaterialTheme.typography.bodyLarge
+      },
       color = textColor,
     )
   }
@@ -674,7 +680,13 @@ private fun MeasurementProfileCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text(
             text = DateFormatUtils.formatDate(entry.createdAt),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(
+              textDirection = if (Locale.getDefault().language == "ur") {
+                TextDirection.Rtl
+              } else {
+                TextDirection.Ltr
+              },
+            ),
             color = mutedText,
             maxLines = 1,
           )
@@ -711,6 +723,8 @@ private fun MeasurementProfileCard(
         kamar = entry.kamar,
         cuff = entry.cuff,
         gheraAsan = entry.gheraAsan,
+        shalwarGhair = entry.shalwarGhair,
+        rawValues = entry.rawInputsMap(),
         dividerColor = dividerColor,
         valueColor = primaryText,
         mutedText = mutedText,
@@ -724,6 +738,7 @@ private fun MeasurementProfileCard(
         pocketStyles = entry.pocketStyles,
         sleeveStyle = entry.sleeveStyle,
         silaiStyle = entry.silaiStyle,
+        shalwarType = entry.shalwarType,
         dividerColor = dividerColor,
         primaryText = primaryText,
         mutedText = mutedText,

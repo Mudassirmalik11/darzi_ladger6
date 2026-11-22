@@ -129,6 +129,9 @@ fun DarziLedgerApp(
   if (user == null) {
     AuthScreen(
       authSessionProvider = appContainer.authSessionProvider,
+      onInteractiveSignIn = { signedInUid ->
+        appContainer.shopCloudRepository.markInteractiveSignIn(signedInUid)
+      },
       modifier = modifier,
     )
   } else {
@@ -157,6 +160,7 @@ private fun AuthenticatedShopShell(
       deviceSyncRepository = appContainer.deviceSyncRepository,
       shopCloudRepository = appContainer.shopCloudRepository,
       authSessionProvider = appContainer.authSessionProvider,
+      appContext = context.applicationContext,
     ),
   )
   val gateState by deviceGateVm.gateState.collectAsStateWithLifecycle()

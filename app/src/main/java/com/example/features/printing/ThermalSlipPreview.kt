@@ -70,7 +70,7 @@ fun ThermalSlipPaperPreview(
     border = BorderStroke(1.dp, ThermalPaperBorder),
     modifier = modifier
       .fillMaxWidth()
-      .heightIn(max = 460.dp),
+      .heightIn(max = 520.dp),
   ) {
     if (parchiData != null) {
       ParchiPaperCard(data = parchiData)
@@ -111,7 +111,7 @@ private fun ParchiPaperCard(
         .padding(12.dp)
         .semantics(mergeDescendants = true) {}
         .testTag("slip_preview_text"),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
       // 1. Highlighted Customer Information Section
       Column(
@@ -149,6 +149,7 @@ private fun ParchiPaperCard(
               label = data.orderIdLabel,
               value = data.orderIdValue,
               emphasizeValue = true,
+              forceLtrIfNoRtl = true,
             )
           }
           if (!data.customerIdLabel.isNullOrBlank() && !data.customerIdValue.isNullOrBlank()) {
@@ -156,6 +157,7 @@ private fun ParchiPaperCard(
               label = data.customerIdLabel,
               value = data.customerIdValue,
               emphasizeValue = true,
+              forceLtrIfNoRtl = true,
             )
           }
           ParchiInfoLine(
@@ -167,6 +169,7 @@ private fun ParchiPaperCard(
             label = data.mobileLabel,
             value = data.mobileValue,
             emphasizeValue = false,
+            forceLtrIfNoRtl = true,
           )
           if (!data.addressLabel.isNullOrBlank() && !data.addressValue.isNullOrBlank()) {
             ParchiInfoLine(
@@ -227,19 +230,20 @@ private fun ParchiPaperCard(
               fontSize = 12.5.sp,
               fontWeight = FontWeight.SemiBold,
               color = ThermalInkSecondary,
+              textDirection = if (data.isUrdu) TextDirection.Rtl else TextDirection.Ltr,
             ),
           )
         }
         HorizontalDivider(thickness = 1.5.dp, color = ThermalAccentInk)
       }
 
-      // 3. 2-Column Stacked Measurements Grid (1..8 Compulsory first, NO cloth icons)
-      ParchiMetricsGrid(cells = data.compulsoryMetrics)
+      // 3. 2-Column Stacked Measurements Grid (1..8 Compulsory first, LTR order matching saved measurements)
+      ParchiMetricsGrid(cells = data.compulsoryMetrics, tagPrefix = "parchi_compulsory")
 
       // 4. Optional Measurements Grid (Only entered values > 0)
       if (data.optionalMetrics.isNotEmpty()) {
         HorizontalDivider(thickness = 1.dp, color = ThermalGridLine)
-        ParchiMetricsGrid(cells = data.optionalMetrics)
+        ParchiMetricsGrid(cells = data.optionalMetrics, tagPrefix = "parchi_optional")
       }
 
       // 5. Additional Notes & Selected Stitching Options
@@ -294,7 +298,35 @@ private fun ParchiInfoLine(
   label: String,
   value: String,
   emphasizeValue: Boolean,
+  forceLtrIfNoRtl: Boolean = false,
 ) {
+  val shouldForceLtr = forceLtrIfNoRtl && value.isNotBlank() && value.none(::isRtlChar)
+  if (shouldForceLtr) {
+    Row(
+      horizontalArrangement = Arrangement.spacedBy(4.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Text(
+        text = "$label:",
+        style = TextStyle(
+          fontWeight = FontWeight.Bold,
+          fontSize = 14.sp,
+          color = ThermalInkSecondary,
+        ),
+      )
+      Text(
+        text = value,
+        style = TextStyle(
+          fontWeight = if (emphasizeValue) FontWeight.ExtraBold else FontWeight.SemiBold,
+          fontSize = if (emphasizeValue) 15.sp else 14.sp,
+          color = ThermalInkPrimary,
+          textDirection = TextDirection.Ltr,
+        ),
+      )
+    }
+    return
+  }
+
   val text = buildAnnotatedString {
     withStyle(
       SpanStyle(
@@ -321,42 +353,61 @@ private fun ParchiInfoLine(
   Text(text = text)
 }
 
+private fun isRtlChar(ch: Char): Boolean {
+  val dir = Character.getDirectionality(ch)
+  return dir == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
+    dir == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC ||
+    dir == Character.DIRECTIONALITY_RIGHT_TO_LEFT_EMBEDDING ||
+    dir == Character.DIRECTIONALITY_RIGHT_TO_LEFT_OVERRIDE ||
+    dir == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ISOLATE
+}
+
 @Composable
-private fun ParchiMetricsGrid(cells: List<ParchiMetricCell>) {
+private fun ParchiMetricsGrid(
+  cells: List<ParchiMetricCell>,
+  tagPrefix: String,
+) {
   val rows = cells.chunked(2)
-  Column(
-    modifier = Modifier
-      .fillMaxWidth()
-      .clip(RoundedCornerShape(8.dp))
-      .border(1.dp, ThermalGridLine, RoundedCornerShape(8.dp)),
-  ) {
-    rows.forEachIndexed { rowIndex, pair ->
-      if (rowIndex > 0) {
-        HorizontalDivider(thickness = 1.dp, color = ThermalGridLine)
-      }
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .height(IntrinsicSize.Min)
-          .background(if (rowIndex % 2 == 0) ThermalPaperSurface else ThermalCellBg),
-      ) {
-        ParchiMetricCellBox(
-          cell = pair[0],
-          modifier = Modifier.weight(1f),
-        )
-        Box(
+  // Keep 2-column grid strictly Left-to-Right matching SavedMeasurementMetricsGrid (Kameez Lambai Left, Teera Right)
+  CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(8.dp))
+        .border(1.dp, ThermalGridLine, RoundedCornerShape(8.dp)),
+    ) {
+      rows.forEachIndexed { rowIndex, pair ->
+        if (rowIndex > 0) {
+          HorizontalDivider(thickness = 1.dp, color = ThermalGridLine)
+        }
+        Row(
           modifier = Modifier
-            .width(1.dp)
-            .fillMaxHeight()
-            .background(ThermalGridLine),
-        )
-        if (pair.size > 1) {
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .background(if (rowIndex % 2 == 0) ThermalPaperSurface else ThermalCellBg),
+        ) {
           ParchiMetricCellBox(
-            cell = pair[1],
-            modifier = Modifier.weight(1f),
+            cell = pair[0],
+            modifier = Modifier
+              .weight(1f)
+              .testTag("${tagPrefix}_${rowIndex * 2}"),
           )
-        } else {
-          Spacer(modifier = Modifier.weight(1f))
+          Box(
+            modifier = Modifier
+              .width(1.dp)
+              .fillMaxHeight()
+              .background(ThermalGridLine),
+          )
+          if (pair.size > 1) {
+            ParchiMetricCellBox(
+              cell = pair[1],
+              modifier = Modifier
+                .weight(1f)
+                .testTag("${tagPrefix}_${rowIndex * 2 + 1}"),
+            )
+          } else {
+            Spacer(modifier = Modifier.weight(1f))
+          }
         }
       }
     }
@@ -369,14 +420,14 @@ private fun ParchiMetricCellBox(
   modifier: Modifier = Modifier,
 ) {
   Column(
-    modifier = modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+    modifier = modifier.padding(horizontal = 8.dp, vertical = 8.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.spacedBy(2.dp),
   ) {
     Text(
       text = cell.label,
       style = TextStyle(
-        fontSize = 13.sp,
+        fontSize = 12.5.sp,
         fontWeight = FontWeight.Bold,
         color = ThermalInkSecondary,
       ),
@@ -385,9 +436,10 @@ private fun ParchiMetricCellBox(
     Text(
       text = cell.value,
       style = TextStyle(
-        fontSize = 22.sp,
+        fontSize = 20.sp,
         fontWeight = FontWeight.ExtraBold,
         color = ThermalInkPrimary,
+        textDirection = TextDirection.Ltr,
       ),
       textAlign = TextAlign.Center,
     )

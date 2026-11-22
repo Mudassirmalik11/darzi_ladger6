@@ -8,6 +8,7 @@ import com.example.core.model.PaymentMethod
 import com.example.core.model.PaymentStatus
 import com.example.core.model.PocketStyle
 import com.example.core.model.PocketStyleCodec
+import com.example.core.model.ShalwarType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.SnapshotJson
@@ -104,11 +105,14 @@ object SyncMappers {
     "shalwarLambai" to entity.shalwarLambai,
     "paincha" to entity.paincha,
     "gheraAsan" to entity.gheraAsan,
+    "shalwarGhair" to entity.shalwarGhair,
     "neckStyle" to (entity.neckStyle?.name ?: ""),
     "damanStyle" to (entity.damanStyle?.name ?: ""),
     "pocketStyle" to PocketStyleCodec.encode(entity.pocketStyles),
     "sleeveStyle" to (entity.sleeveStyle?.name ?: ""),
     "silaiStyle" to (entity.silaiStyle?.name ?: ""),
+    "shalwarType" to (entity.shalwarType?.name ?: ""),
+    "rawInputsJson" to entity.rawInputsJson.ifBlank { "{}" }.take(500),
     "notes" to entity.notes.trim().take(500),
     "version" to entity.version.coerceAtLeast(1L),
     "lastModifiedByDevice" to entity.lastModifiedByDevice,
@@ -133,11 +137,14 @@ object SyncMappers {
     "shalwarLambai" to entity.shalwarLambai,
     "paincha" to entity.paincha,
     "gheraAsan" to entity.gheraAsan,
+    "shalwarGhair" to entity.shalwarGhair,
     "neckStyle" to (entity.neckStyle?.name ?: ""),
     "damanStyle" to (entity.damanStyle?.name ?: ""),
     "pocketStyle" to PocketStyleCodec.encode(entity.pocketStyles),
     "sleeveStyle" to (entity.sleeveStyle?.name ?: ""),
     "silaiStyle" to (entity.silaiStyle?.name ?: ""),
+    "shalwarType" to (entity.shalwarType?.name ?: ""),
+    "rawInputsJson" to entity.rawInputsJson.ifBlank { "{}" }.take(500),
     "notes" to entity.notes.trim().take(500),
     "version" to entity.version.coerceAtLeast(1L),
     "lastModifiedByDevice" to entity.lastModifiedByDevice,
@@ -162,11 +169,14 @@ object SyncMappers {
     shalwarLambai = shalwarLambai,
     paincha = paincha,
     gheraAsan = gheraAsan,
+    shalwarGhair = shalwarGhair,
     neckStyle = safeEnumOrNull<NeckStyle>(neckStyle),
     damanStyle = safeEnumOrNull<DamanStyle>(damanStyle),
     pocketStyles = PocketStyleCodec.decode(pocketStyle),
     sleeveStyle = safeEnumOrNull<SleeveStyle>(sleeveStyle),
     silaiStyle = safeEnumOrNull<SilaiStyle>(silaiStyle),
+    shalwarType = safeEnumOrNull<ShalwarType>(shalwarType),
+    rawInputsJson = rawInputsJson.ifBlank { "{}" },
     notes = notes,
     createdAt = createdAtEpochMillis.takeIf { it > 0L } ?: (createdAt?.toDate()?.time ?: System.currentTimeMillis()),
     updatedAt = updatedAtEpochMillis.takeIf { it > 0L } ?: (updatedAt?.toDate()?.time ?: System.currentTimeMillis()),
@@ -190,6 +200,8 @@ object SyncMappers {
       "shalwarLambai" to meas.shalwarLambai,
       "paincha" to meas.paincha,
       "gheraAsan" to meas.gheraAsan,
+      "shalwarGhair" to meas.shalwarGhair,
+      "rawInputsJson" to SnapshotJson.encodeRawMap(meas.rawValues).take(500),
       "notes" to meas.notes.trim().take(500),
     )
     meas.sourceMeasurementId?.takeIf { it.isNotBlank() }?.let {
@@ -202,6 +214,7 @@ object SyncMappers {
       "pocketStyle" to PocketStyleCodec.encode(style.effectivePocketStyles()),
       "sleeveStyle" to (style.sleeveStyle?.name ?: ""),
       "silaiStyle" to (style.silaiStyle?.name ?: ""),
+      "shalwarType" to (style.shalwarType?.name ?: ""),
     )
 
     val map = mutableMapOf<String, Any>(
@@ -274,6 +287,8 @@ object SyncMappers {
       shalwarLambai = (measurementSnapshot["shalwarLambai"] as? Number)?.toDouble() ?: 39.0,
       paincha = (measurementSnapshot["paincha"] as? Number)?.toDouble() ?: 7.5,
       gheraAsan = (measurementSnapshot["gheraAsan"] as? Number)?.toDouble() ?: 0.0,
+      shalwarGhair = (measurementSnapshot["shalwarGhair"] as? Number)?.toDouble() ?: 0.0,
+      rawValues = SnapshotJson.decodeRawMap(measurementSnapshot["rawInputsJson"] as? String),
       notes = measurementSnapshot["notes"] as? String ?: "",
     )
     val decodedPockets = PocketStyleCodec.decode(styleSnapshot["pocketStyle"] as? String)
@@ -284,6 +299,7 @@ object SyncMappers {
       pocketStyles = PocketStyleCodec.ordered(decodedPockets),
       sleeveStyle = safeEnumOrNull<SleeveStyle>(styleSnapshot["sleeveStyle"] as? String),
       silaiStyle = safeEnumOrNull<SilaiStyle>(styleSnapshot["silaiStyle"] as? String),
+      shalwarType = safeEnumOrNull<ShalwarType>(styleSnapshot["shalwarType"] as? String),
     )
     return OrderEntity(
       orderId = id,

@@ -570,6 +570,13 @@ fun CreateOrderScreen(
               tag = "order_meas_asan",
               onValueChange = { v -> viewModel.updateForm { it.copy(gheraAsan = v) } },
             ),
+            EditableMetricSpec(
+              key = MeasurementFieldKey.SHALWAR_GHAIR,
+              label = stringResource(R.string.meas_shalwar_ghair),
+              value = state.shalwarGhair,
+              tag = "order_meas_shalwar_ghair",
+              onValueChange = { v -> viewModel.updateForm { it.copy(shalwarGhair = v) } },
+            ),
           )
 
           Surface(
@@ -678,6 +685,8 @@ fun CreateOrderScreen(
             onSelectSleeveStyle = { style -> viewModel.updateForm { it.copy(sleeveStyle = style) } },
             silaiStyle = state.silaiStyle,
             onSelectSilaiStyle = { style -> viewModel.updateForm { it.copy(silaiStyle = style) } },
+            shalwarType = state.shalwarType,
+            onSelectShalwarType = { style -> viewModel.updateForm { it.copy(shalwarType = style) } },
             footerContent = {
               HorizontalDivider(color = dividerColor)
               Row(

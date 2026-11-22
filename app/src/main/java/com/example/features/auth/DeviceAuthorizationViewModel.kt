@@ -58,6 +58,7 @@ class DeviceAuthorizationViewModel(
   private val deviceSyncRepository: DeviceSyncRepository,
   private val shopCloudRepository: ShopCloudRepository,
   private val authSessionProvider: AuthSessionProvider,
+  private val appContext: Context? = null,
 ) : ViewModel() {
 
   private val _gateState = MutableStateFlow<DeviceGateState>(DeviceGateState.Checking)
@@ -224,16 +225,47 @@ class DeviceAuthorizationViewModel(
         )
       }
       is DeviceAccessState.Revoked -> {
-        sessionObserverJob?.cancel()
-        _gateState.value = DeviceGateState.Revoked(
-          localDevice = access.currentDevice,
-          registeredDevices = access.allDevices,
-          userRole = access.userRole,
-        )
+        viewModelScope.launch {
+          forceSignOutOnSessionEnded(access.allDevices, access.currentDevice, access.userRole)
+        }
       }
       is DeviceAccessState.StaffAccessRevoked -> {
         sessionObserverJob?.cancel()
         _gateState.value = DeviceGateState.StaffAccessRevoked(email = access.email)
+      }
+    }
+  }
+
+  private suspend fun forceSignOutOnSessionEnded(
+    allDevices: List<DeviceRegistrationDoc> = emptyList(),
+    localDevice: DeviceConfigEntity? = null,
+    userRole: ShopUserRole = ShopUserRole.OWNER,
+  ) {
+    val activeObserverJob = sessionObserverJob
+    sessionObserverJob = null
+    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+      activeObserverJob?.cancel()
+      val existing = localDevice ?: deviceSyncRepository.getDeviceConfigForUser(uid)
+      if (existing != null) {
+        deviceSyncRepository.updateDeviceAuthorization(
+          deviceId = existing.deviceId,
+          shopId = existing.shopId,
+          deviceName = existing.deviceName,
+          deviceRole = existing.deviceRole,
+          status = DeviceRegistrationStatus.UNREGISTERED,
+          userUid = uid,
+          userRole = userRole.name,
+        )
+      }
+      val ctx = appContext
+      if (ctx != null) {
+        authSessionProvider.signOut(ctx)
+      } else if (existing != null) {
+        _gateState.value = DeviceGateState.Revoked(
+          localDevice = existing,
+          registeredDevices = allDevices,
+          userRole = userRole,
+        )
       }
     }
   }
@@ -271,19 +303,7 @@ class DeviceAuthorizationViewModel(
               )
             }
             is SessionStatusUpdate.DeviceRevoked -> {
-              val existing = deviceSyncRepository.getDeviceConfigForUser(uid)
-              if (existing != null && existing.deviceId == status.deviceId) {
-                deviceSyncRepository.updateDeviceAuthorization(
-                  deviceId = existing.deviceId,
-                  shopId = shopId,
-                  deviceName = existing.deviceName,
-                  deviceRole = existing.deviceRole,
-                  status = DeviceRegistrationStatus.REVOKED,
-                  userUid = uid,
-                  userRole = userRole.name,
-                )
-              }
-              evaluateDeviceAccess()
+              forceSignOutOnSessionEnded(userRole = userRole)
             }
             is SessionStatusUpdate.Active -> Unit
           }
@@ -301,6 +321,7 @@ class DeviceAuthorizationViewModel(
     private val deviceSyncRepository: DeviceSyncRepository,
     private val shopCloudRepository: ShopCloudRepository,
     private val authSessionProvider: AuthSessionProvider,
+    private val appContext: Context? = null,
   ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -309,6 +330,7 @@ class DeviceAuthorizationViewModel(
         deviceSyncRepository = deviceSyncRepository,
         shopCloudRepository = shopCloudRepository,
         authSessionProvider = authSessionProvider,
+        appContext = appContext?.applicationContext,
       ) as T
     }
   }
