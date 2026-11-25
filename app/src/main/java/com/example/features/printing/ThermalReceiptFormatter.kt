@@ -20,6 +20,7 @@ import com.example.core.model.PaymentMethod
 import com.example.core.model.PaymentStatus
 import com.example.core.model.PocketStyle
 import com.example.core.model.ShalwarType
+import com.example.core.model.ShoulderType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.StyleSnapshot
@@ -2172,6 +2173,7 @@ object ThermalReceiptFormatter {
         style.damanStyle?.let { add("دامن: ${damanStyleLabel(it, true)}") }
         if (pockets.isNotEmpty()) add("جیب: ${pocketStylesLabel(pockets, true)}")
         style.sleeveStyle?.let { add("آستین: ${sleeveStyleLabel(it, true)}") }
+        style.shoulderType?.let { add("کندھا: ${shoulderTypeLabel(it, true)}") }
         style.shalwarType?.let { add("شلوار: ${shalwarTypeLabel(it, true)}") }
         style.silaiStyle?.let { add("سلائی: ${silaiStyleLabel(it, true)}") }
       }
@@ -2183,6 +2185,7 @@ object ThermalReceiptFormatter {
           add("${if (compact) "Pkts" else "Pockets"}: ${pocketStylesLabel(pockets, false, compact)}")
         }
         style.sleeveStyle?.let { add("${if (compact) "Slv" else "Sleeves"}: ${sleeveStyleLabel(it, false, compact)}") }
+        style.shoulderType?.let { add("${if (compact) "Shldr" else "Shoulder"}: ${shoulderTypeLabel(it, false, compact)}") }
         style.shalwarType?.let { add("Shalwar: ${shalwarTypeLabel(it, false)}") }
         style.silaiStyle?.let { add("Silai: ${silaiStyleLabel(it, false, compact)}") }
       }
@@ -2248,6 +2251,19 @@ object ThermalReceiptFormatter {
       SleeveStyle.STUDS -> "اسٹڈ"
     }
 
+  private fun shoulderTypeLabel(style: ShoulderType, isUrdu: Boolean, compact: Boolean = false): String =
+    if (!isUrdu) {
+      if (!compact) style.displayName else when (style) {
+        ShoulderType.DOWN_SHOULDER -> "Down"
+        ShoulderType.HANGER_SHOULDER -> "Hanger"
+        ShoulderType.FULL_DOWN_SHOULDER -> "Full Down"
+      }
+    } else when (style) {
+      ShoulderType.DOWN_SHOULDER -> "ڈاؤن شولڈر"
+      ShoulderType.HANGER_SHOULDER -> "ہینگر شولڈر"
+      ShoulderType.FULL_DOWN_SHOULDER -> "فل ڈاؤن شولڈر"
+    }
+
   private fun shalwarTypeLabel(style: ShalwarType, isUrdu: Boolean): String =
     if (!isUrdu) style.displayName else when (style) {
       ShalwarType.SMART -> "سمارٹ"
@@ -2261,12 +2277,12 @@ object ThermalReceiptFormatter {
       if (!compact) style.displayName else when (style) {
         SilaiStyle.SINGLE -> "Single"
         SilaiStyle.DOUBLE -> "Double"
-        SilaiStyle.CHAMAK_DHAGA -> "Chamak"
+        SilaiStyle.KAMDO_DHAGA -> "Kamdo"
       }
     } else when (style) {
       SilaiStyle.SINGLE -> "سنگل"
       SilaiStyle.DOUBLE -> "ڈبل"
-      SilaiStyle.CHAMAK_DHAGA -> "چمک دھاگہ"
+      SilaiStyle.KAMDO_DHAGA -> "کمدو دھاگہ"
     }
 
   private fun sanitize(input: String, preserveUnicode: Boolean): String =

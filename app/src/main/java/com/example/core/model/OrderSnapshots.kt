@@ -32,6 +32,7 @@ data class StyleSnapshot(
   val sleeveStyle: SleeveStyle? = null,
   val silaiStyle: SilaiStyle? = null,
   val shalwarType: ShalwarType? = null,
+  val shoulderType: ShoulderType? = null,
   // Extensible per-suit overrides for future versions without breaking existing orders
   val perSuitOverrides: List<SuitStyleOverride> = emptyList(),
 ) {
@@ -54,6 +55,7 @@ data class SuitStyleOverride(
   val sleeveStyle: SleeveStyle? = null,
   val silaiStyle: SilaiStyle? = null,
   val shalwarType: ShalwarType? = null,
+  val shoulderType: ShoulderType? = null,
 )
 
 object SnapshotJson {

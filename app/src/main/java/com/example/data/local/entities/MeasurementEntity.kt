@@ -12,6 +12,7 @@ import com.example.core.model.PocketStyle
 import com.example.core.model.PocketStyleCodec
 import com.example.core.model.PocketStyleSetSerializer
 import com.example.core.model.ShalwarType
+import com.example.core.model.ShoulderType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.SnapshotJson
@@ -64,6 +65,7 @@ data class MeasurementEntity(
   val sleeveStyle: SleeveStyle? = null,
   val silaiStyle: SilaiStyle? = null,
   val shalwarType: ShalwarType? = null,
+  val shoulderType: ShoulderType? = null,
   val rawInputsJson: String = "{}",
   val notes: String = "",
   val createdAt: Long,
@@ -102,6 +104,7 @@ data class MeasurementEntity(
       sleeveStyle = sleeveStyle,
       silaiStyle = silaiStyle,
       shalwarType = shalwarType,
+      shoulderType = shoulderType,
     )
   }
 }

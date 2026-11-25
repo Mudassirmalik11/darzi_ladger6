@@ -483,7 +483,14 @@ fun localizedSleeveStyle(style: SleeveStyle): String = when (style) {
 fun localizedSilaiStyle(style: SilaiStyle): String = when (style) {
   SilaiStyle.SINGLE -> stringResource(R.string.style_opt_silai_single)
   SilaiStyle.DOUBLE -> stringResource(R.string.style_opt_silai_double)
-  SilaiStyle.CHAMAK_DHAGA -> stringResource(R.string.style_opt_silai_chamak)
+  SilaiStyle.KAMDO_DHAGA -> stringResource(R.string.style_opt_silai_kamdo)
+}
+
+@Composable
+fun localizedShoulderType(style: com.example.core.model.ShoulderType): String = when (style) {
+  com.example.core.model.ShoulderType.DOWN_SHOULDER -> stringResource(R.string.style_opt_shoulder_down)
+  com.example.core.model.ShoulderType.HANGER_SHOULDER -> stringResource(R.string.style_opt_shoulder_hanger)
+  com.example.core.model.ShoulderType.FULL_DOWN_SHOULDER -> stringResource(R.string.style_opt_shoulder_full_down)
 }
 
 @Composable

@@ -49,11 +49,23 @@ interface CustomerDao {
   @Upsert
   suspend fun insert(customer: CustomerEntity)
 
+  @Upsert
+  suspend fun insertAll(customers: List<CustomerEntity>)
+
   @Update
   suspend fun update(customer: CustomerEntity)
 
   @Query("SELECT COUNT(*) FROM customers WHERE isDeleted = 0")
   fun observeActiveCount(): Flow<Int>
+
+  @Query("SELECT customerId FROM customers")
+  suspend fun getAllIds(): List<String>
+
+  @Query("SELECT customerId FROM customers WHERE customerId IN (:customerIds)")
+  suspend fun getExistingIds(customerIds: List<String>): List<String>
+
+  @Query("SELECT * FROM customers WHERE customerId IN (:customerIds)")
+  suspend fun getByIds(customerIds: List<String>): List<CustomerEntity>
 
   @Query("SELECT * FROM customers ORDER BY createdAt ASC")
   suspend fun getAllForBackup(): List<CustomerEntity>

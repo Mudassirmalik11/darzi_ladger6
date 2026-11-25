@@ -459,22 +459,34 @@ class CustomerMeasurementFlowTest {
     composeTestRule.onNodeWithTag("tailor_measurement_keyboard").assertIsDisplayed()
     composeTestRule.onNodeWithTag("meas_kameez_lambai").assertIsFocused()
 
-    // Real-time error border triggers immediately when out-of-range value ("5") is entered
-    composeTestRule.onNodeWithTag("keypad_key_5").performClick()
+    // Entering arbitrary digits (e.g. 788, 0) or dual-slash (8/10) has NO range error; only malformed syntax (41.) errors
+    composeTestRule.onNodeWithTag("keypad_key_7").performClick()
+    composeTestRule.onNodeWithTag("keypad_key_8").performClick()
+    composeTestRule.onNodeWithTag("keypad_key_8").performClick()
+    composeTestRule.waitForIdle()
+    assert(
+      composeTestRule.onAllNodesWithText("Enter a valid value (e.g. 0, 41.5, or 8/10).")
+        .fetchSemanticsNodes().isEmpty(),
+    )
+    repeat(3) { composeTestRule.onNodeWithTag("keypad_key_backspace").performClick() }
+
+    composeTestRule.onNodeWithTag("keypad_key_4").performClick()
+    composeTestRule.onNodeWithTag("keypad_key_1").performClick()
+    composeTestRule.onNodeWithTag("keypad_key_dot_slash").performClick()
     composeTestRule.waitForIdle()
     composeTestRule.onNodeWithTag("meas_kameez_lambai")
       .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Error))
-    composeTestRule.onAllNodesWithText("Kameez Lambai must be 20–60 in.").onFirst().assertIsDisplayed()
+    composeTestRule.onAllNodesWithText("Enter a valid value (e.g. 0, 41.5, or 8/10).")
+      .onFirst().assertIsDisplayed()
 
-    // Clear with backspace and enter "41 1/2" via custom keypad
+    // Clear trailing dot and enter "41 1/2" via custom keypad
     composeTestRule.onNodeWithTag("keypad_key_backspace").performClick()
-    composeTestRule.onNodeWithTag("keypad_key_4").performClick()
-    composeTestRule.onNodeWithTag("keypad_key_1").performClick()
     composeTestRule.onNodeWithTag("keypad_key_half").performClick()
     composeTestRule.waitForIdle()
-    composeTestRule.onAllNodesWithText("Kameez Lambai must be 20–60 in.").fetchSemanticsNodes().let {
-      assert(it.isEmpty())
-    }
+    assert(
+      composeTestRule.onAllNodesWithText("Enter a valid value (e.g. 0, 41.5, or 8/10).")
+        .fetchSemanticsNodes().isEmpty(),
+    )
 
     // Tap Next -> advances focus sequentially 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
     // Field 2: Teera (18)
@@ -583,8 +595,9 @@ class CustomerMeasurementFlowTest {
       "style_daman_gol", "style_daman_chorasi",
       "style_pocket_front", "style_pocket_one_side", "style_pocket_two_side", "style_pocket_shalwar_pocket",
       "style_sleeve_kaf", "style_sleeve_kurta",
+      "style_shoulder_down_shoulder", "style_shoulder_hanger_shoulder", "style_shoulder_full_down_shoulder",
       "style_shalwar_smart", "style_shalwar_normal", "style_shalwar_panjama", "style_shalwar_balochi",
-      "style_silai_single", "style_silai_double", "style_silai_chamak_dhaga",
+      "style_silai_single", "style_silai_double", "style_silai_kamdo_dhaga",
     ).forEach { tag ->
       composeTestRule.onNodeWithTag(tag).performScrollTo().assertIsNotSelected()
     }
@@ -595,13 +608,17 @@ class CustomerMeasurementFlowTest {
     composeTestRule.onNodeWithTag("style_neck_collar").performClick()
     composeTestRule.onNodeWithTag("style_neck_collar").assertIsNotSelected()
 
-    // Choose Collar, Kaf sleeve, and Balochi shalwar; leave Daman, Pockets, Silai unselected
+    // Choose Collar, Kaf sleeve, Down Shoulder, Balochi shalwar, and Kamdo Dhaga silai; leave Daman and Pockets unselected
     composeTestRule.onNodeWithTag("style_neck_collar").performClick()
     composeTestRule.onNodeWithTag("style_neck_collar").assertIsSelected()
     composeTestRule.onNodeWithTag("style_sleeve_kaf").performScrollTo().performClick()
     composeTestRule.onNodeWithTag("style_sleeve_kaf").assertIsSelected()
+    composeTestRule.onNodeWithTag("style_shoulder_down_shoulder").performScrollTo().performClick()
+    composeTestRule.onNodeWithTag("style_shoulder_down_shoulder").assertIsSelected()
     composeTestRule.onNodeWithTag("style_shalwar_balochi").performScrollTo().performClick()
     composeTestRule.onNodeWithTag("style_shalwar_balochi").assertIsSelected()
+    composeTestRule.onNodeWithTag("style_silai_kamdo_dhaga").performScrollTo().performClick()
+    composeTestRule.onNodeWithTag("style_silai_kamdo_dhaga").assertIsSelected()
 
     // Fill only the 8 compulsory measurements; leave optional Kamar, Cuff, Asan, Shalwar Ghair blank
     composeTestRule.onNodeWithTag("meas_kameez_lambai").performScrollTo().performTextInput("40")
@@ -653,19 +670,23 @@ class CustomerMeasurementFlowTest {
     assert(composeTestRule.onAllNodesWithTag("saved_meas_shalwar_ghair").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithText("—").fetchSemanticsNodes().isEmpty())
 
-    // Only chosen Neck, Sleeves (Kaf), and Shalwar Type (Balochi) appear; unselected defaults must NOT appear
+    // Only chosen Neck, Sleeves (Kaf), Shoulder (Down Shoulder), Shalwar Type (Balochi), and Silai (Kamdo Dhaga) appear; unselected defaults must NOT appear
     composeTestRule.onNodeWithTag("customer_detail_content")
       .performScrollToNode(hasTestTag("saved_style_neck"))
     composeTestRule.onNodeWithTag("saved_style_neck").performScrollTo().assertIsDisplayed()
     composeTestRule.onAllNodesWithText("Collar").onFirst().assertIsDisplayed()
     composeTestRule.onNodeWithTag("saved_style_sleeves").performScrollTo().assertIsDisplayed()
     composeTestRule.onAllNodesWithText("Kaf").onFirst().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("saved_style_shoulder").performScrollTo().assertIsDisplayed()
+    composeTestRule.onAllNodesWithText("Down Shoulder").onFirst().assertIsDisplayed()
     composeTestRule.onNodeWithTag("saved_style_shalwar").performScrollTo().assertIsDisplayed()
     composeTestRule.onAllNodesWithText("Balochi").onFirst().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("saved_style_silai").performScrollTo().assertIsDisplayed()
+    composeTestRule.onAllNodesWithText("Kamdo Dhaga").onFirst().assertIsDisplayed()
     assert(composeTestRule.onAllNodesWithTag("saved_style_daman").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithTag("saved_style_pockets").fetchSemanticsNodes().isEmpty())
-    assert(composeTestRule.onAllNodesWithTag("saved_style_silai").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithText("Gol Daman").fetchSemanticsNodes().isEmpty())
+    assert(composeTestRule.onAllNodesWithText("Chamak Dhaga").fetchSemanticsNodes().isEmpty())
     assert(composeTestRule.onAllNodesWithText("Single Silai").fetchSemanticsNodes().isEmpty())
 
     // Edit measurement to enter optional Kamar + Shalwar Ghair -> must appear below Poncha

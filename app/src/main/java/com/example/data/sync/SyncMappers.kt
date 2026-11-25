@@ -9,6 +9,7 @@ import com.example.core.model.PaymentStatus
 import com.example.core.model.PocketStyle
 import com.example.core.model.PocketStyleCodec
 import com.example.core.model.ShalwarType
+import com.example.core.model.ShoulderType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.SnapshotJson
@@ -112,6 +113,7 @@ object SyncMappers {
     "sleeveStyle" to (entity.sleeveStyle?.name ?: ""),
     "silaiStyle" to (entity.silaiStyle?.name ?: ""),
     "shalwarType" to (entity.shalwarType?.name ?: ""),
+    "shoulderType" to (entity.shoulderType?.name ?: ""),
     "rawInputsJson" to entity.rawInputsJson.ifBlank { "{}" }.take(500),
     "notes" to entity.notes.trim().take(500),
     "version" to entity.version.coerceAtLeast(1L),
@@ -144,6 +146,7 @@ object SyncMappers {
     "sleeveStyle" to (entity.sleeveStyle?.name ?: ""),
     "silaiStyle" to (entity.silaiStyle?.name ?: ""),
     "shalwarType" to (entity.shalwarType?.name ?: ""),
+    "shoulderType" to (entity.shoulderType?.name ?: ""),
     "rawInputsJson" to entity.rawInputsJson.ifBlank { "{}" }.take(500),
     "notes" to entity.notes.trim().take(500),
     "version" to entity.version.coerceAtLeast(1L),
@@ -174,8 +177,9 @@ object SyncMappers {
     damanStyle = safeEnumOrNull<DamanStyle>(damanStyle),
     pocketStyles = PocketStyleCodec.decode(pocketStyle),
     sleeveStyle = safeEnumOrNull<SleeveStyle>(sleeveStyle),
-    silaiStyle = safeEnumOrNull<SilaiStyle>(silaiStyle),
+    silaiStyle = SilaiStyle.fromRaw(silaiStyle),
     shalwarType = safeEnumOrNull<ShalwarType>(shalwarType),
+    shoulderType = safeEnumOrNull<ShoulderType>(shoulderType),
     rawInputsJson = rawInputsJson.ifBlank { "{}" },
     notes = notes,
     createdAt = createdAtEpochMillis.takeIf { it > 0L } ?: (createdAt?.toDate()?.time ?: System.currentTimeMillis()),
@@ -215,6 +219,7 @@ object SyncMappers {
       "sleeveStyle" to (style.sleeveStyle?.name ?: ""),
       "silaiStyle" to (style.silaiStyle?.name ?: ""),
       "shalwarType" to (style.shalwarType?.name ?: ""),
+      "shoulderType" to (style.shoulderType?.name ?: ""),
     )
 
     val map = mutableMapOf<String, Any>(
@@ -298,8 +303,9 @@ object SyncMappers {
       pocketStyle = decodedPockets.firstOrNull(),
       pocketStyles = PocketStyleCodec.ordered(decodedPockets),
       sleeveStyle = safeEnumOrNull<SleeveStyle>(styleSnapshot["sleeveStyle"] as? String),
-      silaiStyle = safeEnumOrNull<SilaiStyle>(styleSnapshot["silaiStyle"] as? String),
+      silaiStyle = SilaiStyle.fromRaw(styleSnapshot["silaiStyle"] as? String),
       shalwarType = safeEnumOrNull<ShalwarType>(styleSnapshot["shalwarType"] as? String),
+      shoulderType = safeEnumOrNull<ShoulderType>(styleSnapshot["shoulderType"] as? String),
     )
     return OrderEntity(
       orderId = id,

@@ -56,15 +56,15 @@ service cloud.firestore {
     }
 
     function isValidInchValue(val) {
-      return (val is int || val is float) && val > 0 && val <= 200;
+      return (val is int || val is float) && val >= 0;
     }
 
     function isValidCuffValue(val) {
-      return (val is int || val is float) && val >= 0 && val <= 200;
+      return (val is int || val is float) && val >= 0;
     }
 
     function isValidOptionalInchValue(val) {
-      return (val is int || val is float) && val >= 0 && val <= 200;
+      return (val is int || val is float) && val >= 0;
     }
 
     function isValidShop(data, userId) {
@@ -154,18 +154,19 @@ service cloud.firestore {
              isValidInchValue(data.chati) &&
              isValidOptionalInchValue(data.kamar) &&
              isValidInchValue(data.gheraDaman) &&
-             isValidInchValue(data.galaCollar) &&
+             isValidOptionalInchValue(data.galaCollar) &&
              isValidOptionalInchValue(data.cuff) &&
-             isValidInchValue(data.shalwarLambai) &&
-             isValidInchValue(data.paincha) &&
+             isValidOptionalInchValue(data.shalwarLambai) &&
+             isValidOptionalInchValue(data.paincha) &&
              isValidOptionalInchValue(data.gheraAsan) &&
              (!('shalwarGhair' in data) || isValidOptionalInchValue(data.shalwarGhair)) &&
              data.neckStyle in ['', 'COLLAR', 'BAN', 'HALF_BAN', 'ROUND'] &&
              data.damanStyle in ['', 'GOL', 'CHORASI'] &&
              isValidPocketStyle(data.pocketStyle) &&
              data.sleeveStyle in ['', 'KAF', 'KURTA', 'PLAIN', 'SINGLE_CUFF', 'DOUBLE_CUFF', 'STUDS'] &&
-             data.silaiStyle in ['', 'SINGLE', 'DOUBLE', 'CHAMAK_DHAGA'] &&
+             data.silaiStyle in ['', 'SINGLE', 'DOUBLE', 'KAMDO_DHAGA', 'CHAMAK_DHAGA'] &&
              (!('shalwarType' in data) || data.shalwarType in ['', 'SMART', 'NORMAL', 'PANJAMA', 'BALOCHI']) &&
+             (!('shoulderType' in data) || data.shoulderType in ['', 'DOWN_SHOULDER', 'HANGER_SHOULDER', 'FULL_DOWN_SHOULDER']) &&
              (!('rawInputsJson' in data) || (data.rawInputsJson is string && data.rawInputsJson.size() <= 500)) &&
              data.notes is string && data.notes.size() <= 500 &&
              data.version is int && data.version >= 1 &&
@@ -195,10 +196,10 @@ service cloud.firestore {
              isValidInchValue(snap.chati) &&
              isValidOptionalInchValue(snap.kamar) &&
              isValidInchValue(snap.gheraDaman) &&
-             isValidInchValue(snap.galaCollar) &&
+             isValidOptionalInchValue(snap.galaCollar) &&
              isValidOptionalInchValue(snap.cuff) &&
-             isValidInchValue(snap.shalwarLambai) &&
-             isValidInchValue(snap.paincha) &&
+             isValidOptionalInchValue(snap.shalwarLambai) &&
+             isValidOptionalInchValue(snap.paincha) &&
              isValidOptionalInchValue(snap.gheraAsan) &&
              (!('shalwarGhair' in snap) || isValidOptionalInchValue(snap.shalwarGhair)) &&
              (!('rawInputsJson' in snap) || (snap.rawInputsJson is string && snap.rawInputsJson.size() <= 500)) &&
@@ -214,13 +215,14 @@ service cloud.firestore {
     function isValidStyleSnapshot(snap) {
       return snap is map &&
              snap.keys().hasAll(['neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle']) &&
-             snap.keys().hasOnly(['neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle', 'shalwarType']) &&
+             snap.keys().hasOnly(['neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle', 'shalwarType', 'shoulderType']) &&
              snap.neckStyle in ['', 'COLLAR', 'BAN', 'HALF_BAN', 'ROUND'] &&
              snap.damanStyle in ['', 'GOL', 'CHORASI'] &&
              isValidPocketStyle(snap.pocketStyle) &&
              snap.sleeveStyle in ['', 'KAF', 'KURTA', 'PLAIN', 'SINGLE_CUFF', 'DOUBLE_CUFF', 'STUDS'] &&
-             snap.silaiStyle in ['', 'SINGLE', 'DOUBLE', 'CHAMAK_DHAGA'] &&
-             (!('shalwarType' in snap) || snap.shalwarType in ['', 'SMART', 'NORMAL', 'PANJAMA', 'BALOCHI']);
+             snap.silaiStyle in ['', 'SINGLE', 'DOUBLE', 'KAMDO_DHAGA', 'CHAMAK_DHAGA'] &&
+             (!('shalwarType' in snap) || snap.shalwarType in ['', 'SMART', 'NORMAL', 'PANJAMA', 'BALOCHI']) &&
+             (!('shoulderType' in snap) || snap.shoulderType in ['', 'DOWN_SHOULDER', 'HANGER_SHOULDER', 'FULL_DOWN_SHOULDER']);
     }
 
     function isValidOrder(data, userId) {
@@ -486,7 +488,7 @@ service cloud.firestore {
                            'ownerUid', 'customerId', 'label', 'currentFlag',
                            'kameezLambai', 'tera', 'bazu', 'chati', 'kamar', 'gheraDaman',
                            'galaCollar', 'cuff', 'shalwarLambai', 'paincha', 'gheraAsan', 'shalwarGhair',
-                           'neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle', 'shalwarType',
+                           'neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle', 'shalwarType', 'shoulderType',
                            'rawInputsJson', 'notes', 'version', 'lastModifiedByDevice', 'deleted',
                            'createdAtEpochMillis', 'updatedAtEpochMillis', 'createdAt', 'updatedAt'
                          ]) &&
@@ -506,12 +508,48 @@ service cloud.firestore {
                            'label', 'currentFlag',
                            'kameezLambai', 'tera', 'bazu', 'chati', 'kamar', 'gheraDaman',
                            'galaCollar', 'cuff', 'shalwarLambai', 'paincha', 'gheraAsan', 'shalwarGhair',
-                           'neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle', 'shalwarType',
+                           'neckStyle', 'damanStyle', 'pocketStyle', 'sleeveStyle', 'silaiStyle', 'shalwarType', 'shoulderType',
                            'rawInputsJson', 'notes', 'version', 'lastModifiedByDevice', 'deleted',
                            'updatedAtEpochMillis', 'updatedAt'
                          ]);
 
         allow delete: if false;
+      }
+
+      function isValidOrderDetailsUpdate() {
+        return incoming().diff(existing()).affectedKeys().hasOnly([
+                 'orderNumber', 'suitCount', 'deliveryDateMillis', 'orderStatus',
+                 'notes', 'version', 'lastModifiedByDevice', 'deleted',
+                 'updatedAtEpochMillis', 'updatedAt'
+               ]) &&
+               (!('orderNumber' in incoming()) || incoming().orderNumber == null || (incoming().orderNumber is int && incoming().orderNumber >= 1001)) &&
+               (!('orderNumber' in existing()) || existing().orderNumber == null || incoming().orderNumber == existing().orderNumber) &&
+               incoming().suitCount is int && incoming().suitCount >= 1 && incoming().suitCount <= 100 &&
+               incoming().deliveryDateMillis is int && incoming().deliveryDateMillis >= 0 &&
+               incoming().orderStatus in ['PENDING', 'READY', 'DELIVERED', 'CANCELLED'] &&
+               (!(existing().orderStatus in ['DELIVERED', 'CANCELLED']) || incoming().orderStatus == existing().orderStatus) &&
+               (
+                 existing().orderStatus != 'CANCELLED' ||
+                 (
+                   incoming().deleted == true &&
+                   incoming().suitCount == existing().suitCount &&
+                   incoming().deliveryDateMillis == existing().deliveryDateMillis &&
+                   incoming().notes == existing().notes
+                 )
+               ) &&
+               incoming().notes is string && incoming().notes.size() <= 500 &&
+               incoming().deleted is bool;
+      }
+
+      function isValidOrderPaymentUpdate() {
+        return existing().orderStatus != 'CANCELLED' &&
+               incoming().diff(existing()).affectedKeys().hasOnly([
+                 'paidAmountPkr', 'remainingAmountPkr', 'paymentStatus',
+                 'version', 'lastModifiedByDevice', 'updatedAtEpochMillis', 'updatedAt'
+               ]) &&
+               incoming().paidAmountPkr is int && incoming().paidAmountPkr >= 0 && incoming().paidAmountPkr <= existing().totalAmountPkr &&
+               incoming().remainingAmountPkr is int && incoming().remainingAmountPkr == (existing().totalAmountPkr - incoming().paidAmountPkr) &&
+               incoming().paymentStatus in ['UNPAID', 'PARTIAL', 'PAID'];
       }
 
       match /orders/{orderId} {
@@ -540,29 +578,13 @@ service cloud.firestore {
 
         allow update: if isShopMember(userId) &&
                          isValidId(orderId) &&
-                         isValidOrder(incoming(), userId) &&
-                         incoming().ownerUid == existing().ownerUid &&
-                         incoming().customerId == existing().customerId &&
-                         incoming().createdAt == existing().createdAt &&
-                         incoming().createdAtEpochMillis == existing().createdAtEpochMillis &&
-                         incoming().measurementSnapshot == existing().measurementSnapshot &&
-                         incoming().styleSnapshot == existing().styleSnapshot &&
-                         existing().orderStatus != 'CANCELLED' &&
-                         (!(existing().orderStatus in ['DELIVERED', 'CANCELLED']) || incoming().orderStatus == existing().orderStatus) &&
-                         (!('orderNumber' in existing()) || incoming().orderNumber == existing().orderNumber) &&
                          isAuthorizedDevice(userId, incoming().lastModifiedByDevice) &&
+                         incoming().version is int && incoming().version >= 1 &&
+                         incoming().updatedAtEpochMillis is int && incoming().updatedAtEpochMillis >= 0 &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
                          (
-                           // Action 1: Status/order details or pending order number assignment
-                           incoming().diff(existing()).affectedKeys().hasOnly([
-                             'orderNumber', 'suitCount', 'deliveryDateMillis', 'orderStatus',
-                             'notes', 'version', 'lastModifiedByDevice', 'deleted',
-                             'updatedAtEpochMillis', 'updatedAt'
-                           ]) ||
-                           // Action 2: Payment settlement update (immutable snapshots preserved)
-                           incoming().diff(existing()).affectedKeys().hasOnly([
-                             'paidAmountPkr', 'remainingAmountPkr', 'paymentStatus',
-                             'version', 'lastModifiedByDevice', 'updatedAtEpochMillis', 'updatedAt'
-                           ])
+                           isValidOrderDetailsUpdate() ||
+                           isValidOrderPaymentUpdate()
                          );
 
         allow delete: if false;

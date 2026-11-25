@@ -70,6 +70,18 @@ interface MeasurementDao {
   @Upsert
   suspend fun insert(measurement: MeasurementEntity)
 
+  @Upsert
+  suspend fun insertAll(measurements: List<MeasurementEntity>)
+
+  @Query(
+    """
+    UPDATE measurements
+    SET isCurrent = 0, updatedAt = :updatedAt
+    WHERE customerId IN (:customerIds) AND isCurrent = 1
+    """
+  )
+  suspend fun clearCurrentFlagForCustomers(customerIds: List<String>, updatedAt: Long)
+
   @Query(
     """
     SELECT * FROM measurements
@@ -80,6 +92,18 @@ interface MeasurementDao {
   )
   suspend fun getLatestActiveForCustomer(customerId: String): MeasurementEntity?
 
+  @Query("SELECT * FROM measurements WHERE customerId = :customerId AND isDeleted = 0 AND isCurrent = 1")
+  suspend fun getAllCurrentForCustomer(customerId: String): List<MeasurementEntity>
+
+  @Query("SELECT * FROM measurements WHERE measurementId IN (:measurementIds)")
+  suspend fun getByIds(measurementIds: List<String>): List<MeasurementEntity>
+
+  @Query("SELECT measurementId FROM measurements")
+  suspend fun getAllIds(): List<String>
+
   @Query("SELECT * FROM measurements ORDER BY createdAt ASC")
   suspend fun getAllForBackup(): List<MeasurementEntity>
+
+  @Query("SELECT DISTINCT customerId FROM measurements WHERE isDeleted = 0")
+  fun observeCustomerIdsWithMeasurements(): Flow<List<String>>
 }

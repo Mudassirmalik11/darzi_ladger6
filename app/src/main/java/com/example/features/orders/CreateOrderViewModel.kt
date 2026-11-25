@@ -11,6 +11,7 @@ import com.example.core.model.PaymentMethod
 import com.example.core.model.PocketStyle
 import com.example.core.model.PocketStyleCodec
 import com.example.core.model.ShalwarType
+import com.example.core.model.ShoulderType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.StyleSnapshot
@@ -56,6 +57,7 @@ data class CreateOrderFormState(
   val sleeveStyle: SleeveStyle? = null,
   val silaiStyle: SilaiStyle? = null,
   val shalwarType: ShalwarType? = null,
+  val shoulderType: ShoulderType? = null,
   // Order & billing fields
   val suitCount: Int = 1,
   val deliveryDateMillis: Long = PkrFormatUtils.startOfDayPlusDays(3),
@@ -173,6 +175,7 @@ class CreateOrderViewModel(
           sleeveStyle = null,
           silaiStyle = null,
           shalwarType = null,
+          shoulderType = null,
           errorMessage = null,
         )
       }
@@ -205,6 +208,7 @@ class CreateOrderViewModel(
       sleeveStyle = meas.sleeveStyle,
       silaiStyle = meas.silaiStyle,
       shalwarType = meas.shalwarType,
+      shoulderType = meas.shoulderType,
       errorMessage = null,
     )
   }
@@ -289,6 +293,7 @@ class CreateOrderViewModel(
       sleeveStyle = s.sleeveStyle,
       silaiStyle = s.silaiStyle,
       shalwarType = s.shalwarType,
+      shoulderType = s.shoulderType,
     )
 
     val totalPkr = s.totalBillPkr
@@ -310,6 +315,7 @@ class CreateOrderViewModel(
           sleeveStyle = s.sleeveStyle,
           silaiStyle = s.silaiStyle,
           shalwarType = s.shalwarType,
+          shoulderType = s.shoulderType,
           label = s.selectedMeasurement?.label ?: "Standard",
           deviceId = device.deviceId,
         )

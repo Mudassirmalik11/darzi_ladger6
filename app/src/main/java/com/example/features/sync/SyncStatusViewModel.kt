@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.model.SyncState
 import com.example.core.ui.localizedAppText
 import com.example.data.local.entities.OrderNumberReservationEntity
+import com.example.data.local.entities.OrderSyncLogEntity
 import com.example.data.local.entities.SyncConflictEntity
 import com.example.data.local.entities.SyncMetadataEntity
 import com.example.data.local.repository.DeviceSyncRepository
@@ -38,6 +39,13 @@ class SyncStatusViewModel(
   val pendingOutboxCount: StateFlow<Int> = deviceSyncRepository.observePendingOutboxCount()
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+  val failedOutboxCount: StateFlow<Int> = deviceSyncRepository.observeFailedOutboxCount()
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+  val orderSyncLogs: StateFlow<List<OrderSyncLogEntity>> =
+    deviceSyncRepository.observeRecentOrderSyncLogs()
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
   val unresolvedConflicts: StateFlow<List<SyncConflictEntity>> =
     deviceSyncRepository.observeUnresolvedConflicts()
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -65,7 +73,7 @@ class SyncStatusViewModel(
     if (_isBusy.value) return
     viewModelScope.launch {
       _isBusy.value = true
-      val result = syncEngine.syncNow()
+      val result = syncEngine.syncNow(forceRetry = true)
       _isBusy.value = false
       result.fold(
         onSuccess = { summary ->
@@ -148,6 +156,16 @@ class SyncStatusViewModel(
           _actionMessage.value = error.localizedMessage
             ?: localizedAppText("Failed to resolve conflict.", "تضاد حل نہیں ہو سکا۔")
         },
+      )
+    }
+  }
+
+  fun clearOrderSyncLogs() {
+    viewModelScope.launch {
+      deviceSyncRepository.clearOrderSyncLogs()
+      _actionMessage.value = localizedAppText(
+        "Order sync logs cleared.",
+        "آرڈر سنک لاگز صاف کر دیے گئے۔",
       )
     }
   }

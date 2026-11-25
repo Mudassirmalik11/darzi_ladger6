@@ -88,6 +88,7 @@ fun CustomersScreen(
   val searchScope by viewModel.searchScope.collectAsStateWithLifecycle()
   val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
   val onlyWithAddress by viewModel.onlyWithAddress.collectAsStateWithLifecycle()
+  val onlyWithoutMeasurements by viewModel.onlyWithoutMeasurements.collectAsStateWithLifecycle()
   val customerItems by viewModel.customerItems.collectAsStateWithLifecycle()
   val selectedCustomerId by viewModel.selectedCustomerId.collectAsStateWithLifecycle()
   val duplicatePrompt by viewModel.duplicatePrompt.collectAsStateWithLifecycle()
@@ -113,12 +114,14 @@ fun CustomersScreen(
           searchScope = searchScope,
           sortOrder = sortOrder,
           onlyWithAddress = onlyWithAddress,
+          onlyWithoutMeasurements = onlyWithoutMeasurements,
           customerItems = customerItems,
           selectedCustomerId = selectedCustomerId,
           onSearchChange = viewModel::updateSearchQuery,
           onScopeChange = viewModel::updateSearchScope,
           onSortChange = viewModel::updateSortOrder,
           onToggleAddressOnly = viewModel::toggleOnlyWithAddress,
+          onToggleWithoutMeasurementsOnly = viewModel::toggleOnlyWithoutMeasurements,
           onCustomerClick = { item -> viewModel.selectCustomer(item.customer.customerId) },
           modifier = Modifier
             .weight(0.45f)
@@ -189,12 +192,14 @@ fun CustomersScreen(
         searchScope = searchScope,
         sortOrder = sortOrder,
         onlyWithAddress = onlyWithAddress,
+        onlyWithoutMeasurements = onlyWithoutMeasurements,
         customerItems = customerItems,
         selectedCustomerId = null,
         onSearchChange = viewModel::updateSearchQuery,
         onScopeChange = viewModel::updateSearchScope,
         onSortChange = viewModel::updateSortOrder,
         onToggleAddressOnly = viewModel::toggleOnlyWithAddress,
+        onToggleWithoutMeasurementsOnly = viewModel::toggleOnlyWithoutMeasurements,
         onCustomerClick = { item -> onOpenCustomerDetail(item.customer.customerId) },
         modifier = Modifier.fillMaxSize(),
       )
@@ -310,12 +315,14 @@ private fun CustomerListPane(
   searchScope: CustomerSearchScope,
   sortOrder: CustomerSortOrder,
   onlyWithAddress: Boolean,
+  onlyWithoutMeasurements: Boolean,
   customerItems: List<CustomerListItem>,
   selectedCustomerId: String?,
   onSearchChange: (String) -> Unit,
   onScopeChange: (CustomerSearchScope) -> Unit,
   onSortChange: (CustomerSortOrder) -> Unit,
   onToggleAddressOnly: () -> Unit,
+  onToggleWithoutMeasurementsOnly: () -> Unit,
   onCustomerClick: (CustomerListItem) -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -372,12 +379,12 @@ private fun CustomerListPane(
           Surface(
             onClick = { showFilterMenu = true },
             shape = RoundedCornerShape(10.dp),
-            color = if (onlyWithAddress || sortOrder != CustomerSortOrder.NEWEST) {
+            color = if (onlyWithAddress || onlyWithoutMeasurements || sortOrder != CustomerSortOrder.NEWEST) {
               AtelierOlive
             } else {
               MaterialTheme.colorScheme.surfaceContainerHigh
             },
-            contentColor = if (onlyWithAddress || sortOrder != CustomerSortOrder.NEWEST) {
+            contentColor = if (onlyWithAddress || onlyWithoutMeasurements || sortOrder != CustomerSortOrder.NEWEST) {
               OnAtelierOlive
             } else {
               MaterialTheme.colorScheme.onSurface
@@ -443,6 +450,15 @@ private fun CustomerListPane(
                 showFilterMenu = false
               },
               testTag = "customers_filter_address_only",
+            )
+            CustomerSortOptionRow(
+              labelRes = R.string.customers_filter_without_measurements,
+              selected = onlyWithoutMeasurements,
+              onClick = {
+                onToggleWithoutMeasurementsOnly()
+                showFilterMenu = false
+              },
+              testTag = "customers_filter_without_measurements",
             )
           }
         }

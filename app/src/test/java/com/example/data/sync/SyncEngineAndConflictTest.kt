@@ -281,6 +281,177 @@ class SyncEngineAndConflictTest {
     assertEquals(SyncStatus.SYNCED, syncedEvent.syncStatus)
     assertTrue(db.deviceSyncDao().observeUnresolvedConflicts().first().isEmpty())
   }
+
+  @Test
+  fun `outbox recovers wedged IN_PROGRESS rows and sorts parent dependencies before LIMIT`() = runBlocking {
+    val baseTime = 1_000_000L
+    // Enqueue measurement & payment with OLDER createdAt than shop & customer to verify SQL priority overrides createdAt
+    db.syncOutboxDao().enqueueAll(
+      listOf(
+        com.example.data.local.entities.SyncOutboxEntity(
+          eventId = "ev_meas",
+          entityType = SyncEntityType.MEASUREMENT,
+          entityId = "m1",
+          operation = com.example.core.model.SyncOperation.CREATE,
+          payloadJson = "{}",
+          syncStatus = SyncStatus.IN_PROGRESS,
+          createdAt = baseTime,
+        ),
+        com.example.data.local.entities.SyncOutboxEntity(
+          eventId = "ev_cust",
+          entityType = SyncEntityType.CUSTOMER,
+          entityId = "c1",
+          operation = com.example.core.model.SyncOperation.CREATE,
+          payloadJson = "{}",
+          syncStatus = SyncStatus.FAILED,
+          nextRetryAt = baseTime + 60_000L,
+          createdAt = baseTime + 10L,
+        ),
+        com.example.data.local.entities.SyncOutboxEntity(
+          eventId = "ev_shop",
+          entityType = SyncEntityType.SHOP,
+          entityId = "s1",
+          operation = com.example.core.model.SyncOperation.UPDATE,
+          payloadJson = "{}",
+          syncStatus = SyncStatus.IN_PROGRESS,
+          createdAt = baseTime + 20L,
+        ),
+      ),
+    )
+
+    db.syncOutboxDao().resetStaleInProgress()
+    db.syncOutboxDao().resetFailedForImmediateRetry(baseTime)
+
+    val ordered = db.syncOutboxDao().getReadyEvents(nowMillis = baseTime, limit = 2)
+    assertEquals(listOf(SyncEntityType.SHOP, SyncEntityType.CUSTOMER), ordered.map { it.entityType })
+
+    db.syncOutboxDao().markInProgressBatch(listOf("ev_shop", "ev_cust"))
+    assertEquals(3, db.syncOutboxDao().observePendingCount().first())
+    db.syncOutboxDao().markSyncedBatch(listOf("ev_shop", "ev_cust"))
+    assertEquals(1, db.syncOutboxDao().observePendingCount().first())
+    assertEquals(SyncEntityType.MEASUREMENT, db.syncOutboxDao().getReadyEvents(baseTime, 10).single().entityType)
+  }
+
+  @Test
+  fun `outbox coalescing, retry schedule, and unresolved parent create queries behave accurately`() = runBlocking {
+    val base = 2_000_000L
+    db.syncOutboxDao().enqueueAll(
+      listOf(
+        com.example.data.local.entities.SyncOutboxEntity(
+          eventId = "o1_create",
+          entityType = SyncEntityType.ORDER,
+          entityId = "order-1",
+          operation = com.example.core.model.SyncOperation.CREATE,
+          payloadJson = "{}",
+          syncStatus = SyncStatus.FAILED,
+          nextRetryAt = base + 5_000L,
+          createdAt = base,
+        ),
+        com.example.data.local.entities.SyncOutboxEntity(
+          eventId = "o1_update",
+          entityType = SyncEntityType.ORDER,
+          entityId = "order-1",
+          operation = com.example.core.model.SyncOperation.UPDATE,
+          payloadJson = "{}",
+          syncStatus = SyncStatus.PENDING,
+          createdAt = base + 100L,
+        ),
+        com.example.data.local.entities.SyncOutboxEntity(
+          eventId = "c1_create",
+          entityType = SyncEntityType.CUSTOMER,
+          entityId = "cust-1",
+          operation = com.example.core.model.SyncOperation.CREATE,
+          payloadJson = "{}",
+          syncStatus = SyncStatus.FAILED,
+          nextRetryAt = base + 2_000L,
+          createdAt = base + 50L,
+        ),
+      ),
+    )
+
+    assertEquals(base + 100L, db.syncOutboxDao().observeLatestPendingCreatedAt().first())
+    assertEquals(base + 2_000L, db.syncOutboxDao().observeNextFailedRetryAt().first())
+    assertEquals(listOf("cust-1"), db.syncOutboxDao().getEntityIdsWithUnresolvedCreate(SyncEntityType.CUSTOMER))
+    assertEquals(listOf("order-1"), db.syncOutboxDao().getEntityIdsWithUnresolvedCreate(SyncEntityType.ORDER))
+
+    // Coalescing order-1 up to o1_update marks both CREATE (FAILED) and UPDATE (PENDING) SYNCED
+    db.syncOutboxDao().markSyncedForEntityUpTo(SyncEntityType.ORDER, "order-1", base + 100L)
+    assertNull(db.syncOutboxDao().observeLatestPendingCreatedAt().first())
+    assertTrue(db.syncOutboxDao().getEntityIdsWithUnresolvedCreate(SyncEntityType.ORDER).isEmpty())
+    assertEquals(1, db.syncOutboxDao().observePendingCount().first())
+  }
+
+  @Test
+  fun `saveMeasurement enqueues cloud update clearing previous isCurrent flag and applier keeps single current`() = runBlocking {
+    val customer = customerRepo.createCustomer(
+      name = "Bilal Ahmed",
+      rawPhone = "0300-5551234",
+      deviceId = "phone-1",
+      nowMillis = 10_000L,
+    ).getOrThrow()
+
+    val snap = MeasurementSnapshot(
+      kameezLambai = 40.0,
+      tera = 18.0,
+      bazu = 24.0,
+      chati = 41.0,
+      kamar = 37.0,
+      gheraDaman = 42.0,
+      galaCollar = 16.0,
+      cuff = 9.0,
+      shalwarLambai = 39.0,
+      paincha = 7.5,
+      gheraAsan = 15.5,
+    )
+
+    val m1 = customerRepo.saveMeasurement(
+      customerId = customer.customerId,
+      snapshot = snap,
+      pocketStyle = PocketStyle.ONE_SIDE,
+      deviceId = "phone-1",
+      nowMillis = 11_000L,
+    ).getOrThrow()
+
+    val m2 = customerRepo.saveMeasurement(
+      customerId = customer.customerId,
+      snapshot = snap.copy(chati = 42.0),
+      pocketStyle = PocketStyle.TWO_SIDE,
+      deviceId = "phone-1",
+      nowMillis = 12_000L,
+    ).getOrThrow()
+
+    val m1InDb = db.measurementDao().getById(m1.measurementId)!!
+    val m2InDb = db.measurementDao().getById(m2.measurementId)!!
+    assertFalse(m1InDb.isCurrent)
+    assertTrue(m2InDb.isCurrent)
+
+    val outboxForM1 = db.syncOutboxDao().getAllEvents().filter { it.entityId == m1.measurementId }
+    assertEquals(2, outboxForM1.size) // CREATE (true) + UPDATE (false)
+    assertEquals(com.example.core.model.SyncOperation.UPDATE, outboxForM1.last().operation)
+    assertTrue(outboxForM1.last().payloadJson.contains("\"isCurrent\":false"))
+
+    // Verify SyncRemoteApplier keeps only newest isCurrent=true when multiple arrive together
+    val applier = SyncRemoteApplier(db)
+    val remoteCust = customer.copy(customerId = "cust-remote", version = 1L)
+    applier.applyRemoteCustomers(listOf(remoteCust))
+    val rOld = m1.copy(
+      measurementId = "r-old",
+      customerId = "cust-remote",
+      isCurrent = true,
+      updatedAt = 20_000L,
+      createdAt = 20_000L,
+    )
+    val rNew = m2.copy(
+      measurementId = "r-new",
+      customerId = "cust-remote",
+      isCurrent = true,
+      updatedAt = 25_000L,
+      createdAt = 25_000L,
+    )
+    applier.applyRemoteMeasurements(listOf(rOld, rNew))
+    assertFalse(db.measurementDao().getById("r-old")!!.isCurrent)
+    assertTrue(db.measurementDao().getById("r-new")!!.isCurrent)
+  }
 }
 
 @RunWith(RobolectricTestRunner::class)

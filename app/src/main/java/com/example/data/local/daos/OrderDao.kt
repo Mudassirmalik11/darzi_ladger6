@@ -24,6 +24,11 @@ data class OrderAnalyticsRow(
   val orderStatus: OrderStatus,
 )
 
+data class OrderNumberHolder(
+  val orderId: String,
+  val orderNumber: Int,
+)
+
 @Dao
 interface OrderDao {
   @Query(
@@ -124,8 +129,23 @@ interface OrderDao {
   @Upsert
   suspend fun insert(order: OrderEntity)
 
+  @Upsert
+  suspend fun insertAll(orders: List<OrderEntity>)
+
   @Update
   suspend fun update(order: OrderEntity)
+
+  @Query("SELECT orderId FROM orders")
+  suspend fun getAllIds(): List<String>
+
+  @Query("SELECT orderId FROM orders WHERE orderId IN (:orderIds)")
+  suspend fun getExistingIds(orderIds: List<String>): List<String>
+
+  @Query("SELECT * FROM orders WHERE orderId IN (:orderIds)")
+  suspend fun getByIds(orderIds: List<String>): List<OrderEntity>
+
+  @Query("SELECT orderId, orderNumber FROM orders WHERE orderNumber IS NOT NULL")
+  suspend fun getAllAssignedOrderNumbers(): List<OrderNumberHolder>
 
   @Query("SELECT * FROM orders ORDER BY createdAt ASC")
   suspend fun getAllForBackup(): List<OrderEntity>

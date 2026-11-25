@@ -44,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.model.MeasurementFieldKey
-import com.example.core.model.TailorValidators
 import com.example.ui.theme.AtelierOlive
 import com.example.ui.theme.AtelierOliveDarkBadge
 import com.example.ui.theme.AtelierOliveDarkCard
@@ -190,9 +189,9 @@ fun TailorMeasurementKeyboard(
   val mutedColor = if (isDarkCanvas) OnAtelierOlive.copy(alpha = 0.72f) else MaterialTheme.colorScheme.onSurfaceVariant
   val dividerColor = if (isDarkCanvas) Color.White.copy(alpha = 0.1f) else MaterialTheme.colorScheme.outlineVariant
 
-  val minStr = TailorValidators.formatLimitNumber(activeField.minInches)
-  val maxStr = TailorValidators.formatLimitNumber(activeField.maxInches)
-  val rangeSummary = stringResource(R.string.measurement_range_error_hint, minStr, maxStr)
+  val fieldModeSummary = stringResource(
+    if (activeField.isRequired) R.string.measurement_required_error_hint else R.string.measurement_optional_hint,
+  )
 
   Surface(
     color = trayColor,
@@ -240,7 +239,7 @@ fun TailorMeasurementKeyboard(
             },
           ) {
             Text(
-              text = fieldError ?: rangeSummary,
+              text = fieldError ?: fieldModeSummary,
               style = MaterialTheme.typography.labelSmall,
               color = if (fieldError != null) MaterialTheme.colorScheme.onErrorContainer else mutedColor,
               maxLines = 1,

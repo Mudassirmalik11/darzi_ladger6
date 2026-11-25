@@ -814,6 +814,24 @@ fun SettingsScreen(
               )
             }
 
+            if (isBackupBusy && pendingRestore == null) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.testTag("settings_backup_loading_row"),
+              ) {
+                CircularProgressIndicator(
+                  modifier = Modifier.size(18.dp),
+                  strokeWidth = 2.dp,
+                )
+                Text(
+                  text = stringResource(R.string.settings_backup_processing),
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.primary,
+                )
+              }
+            }
+
             Row(
               modifier = Modifier.fillMaxWidth(),
               horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -843,7 +861,16 @@ fun SettingsScreen(
               OutlinedButton(
                 onClick = {
                   viewModel.clearBackupError()
-                  restoreBackupLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                  restoreBackupLauncher.launch(
+                    arrayOf(
+                      "application/json",
+                      "text/csv",
+                      "text/comma-separated-values",
+                      "application/csv",
+                      "text/plain",
+                      "*/*",
+                    ),
+                  )
                 },
                 enabled = !isBackupBusy,
                 modifier = Modifier
@@ -861,6 +888,132 @@ fun SettingsScreen(
                 Text(stringResource(R.string.settings_restore_backup))
               }
             }
+
+            OutlinedButton(
+              onClick = {
+                viewModel.clearBackupError()
+                viewModel.previewBundledSheetBackup(context)
+              },
+              enabled = !isBackupBusy,
+              modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .testTag("settings_import_sheet_button"),
+            ) {
+              Icon(
+                imageVector = Icons.Filled.Backup,
+                contentDescription = null,
+                modifier = Modifier
+                  .padding(end = 8.dp)
+                  .size(18.dp),
+              )
+              Text(stringResource(R.string.settings_import_bundled_sheet))
+            }
+
+            OutlinedButton(
+              onClick = {
+                viewModel.clearBackupError()
+                viewModel.previewBundledSheetBackup(context, "google_sheet_400_backup.json")
+              },
+              enabled = !isBackupBusy,
+              modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .testTag("settings_import_sheet_2_button"),
+            ) {
+              Icon(
+                imageVector = Icons.Filled.Backup,
+                contentDescription = null,
+                modifier = Modifier
+                  .padding(end = 8.dp)
+                  .size(18.dp),
+              )
+              Text(stringResource(R.string.settings_import_bundled_sheet_2))
+            }
+
+            OutlinedButton(
+              onClick = {
+                viewModel.clearBackupError()
+                viewModel.previewBundledSheetBackup(context, "google_sheet_500_backup.json")
+              },
+              enabled = !isBackupBusy,
+              modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .testTag("settings_import_sheet_3_button"),
+            ) {
+              Icon(
+                imageVector = Icons.Filled.Backup,
+                contentDescription = null,
+                modifier = Modifier
+                  .padding(end = 8.dp)
+                  .size(18.dp),
+              )
+              Text(stringResource(R.string.settings_import_bundled_sheet_3))
+            }
+
+            OutlinedButton(
+              onClick = {
+                viewModel.clearBackupError()
+                viewModel.previewBundledSheetBackup(context, "google_sheet_600_backup.json")
+              },
+              enabled = !isBackupBusy,
+              modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .testTag("settings_import_sheet_4_button"),
+            ) {
+              Icon(
+                imageVector = Icons.Filled.Backup,
+                contentDescription = null,
+                modifier = Modifier
+                  .padding(end = 8.dp)
+                  .size(18.dp),
+              )
+              Text(stringResource(R.string.settings_import_bundled_sheet_4))
+            }
+
+            OutlinedButton(
+              onClick = {
+                viewModel.clearBackupError()
+                viewModel.previewBundledSheetBackup(context, "google_sheet_700_backup.json")
+              },
+              enabled = !isBackupBusy,
+              modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .testTag("settings_import_sheet_5_button"),
+            ) {
+              Icon(
+                imageVector = Icons.Filled.Backup,
+                contentDescription = null,
+                modifier = Modifier
+                  .padding(end = 8.dp)
+                  .size(18.dp),
+              )
+              Text(stringResource(R.string.settings_import_bundled_sheet_5))
+            }
+
+            Button(
+              onClick = {
+                viewModel.clearBackupError()
+                viewModel.previewBundledSheetBackup(context, "google_sheet_1000_backup.json")
+              },
+              enabled = !isBackupBusy,
+              modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .testTag("settings_import_sheet_6_button"),
+            ) {
+              Icon(
+                imageVector = Icons.Filled.Backup,
+                contentDescription = null,
+                modifier = Modifier
+                  .padding(end = 8.dp)
+                  .size(18.dp),
+              )
+              Text(stringResource(R.string.settings_import_bundled_sheet_6))
+            }
           }
         }
       }
@@ -870,7 +1023,11 @@ fun SettingsScreen(
   if (activeRestore != null) {
     val summary = activeRestore.summary
     AlertDialog(
-      onDismissRequest = viewModel::dismissPendingRestore,
+      onDismissRequest = {
+        if (!isBackupBusy) {
+          viewModel.dismissPendingRestore()
+        }
+      },
       modifier = Modifier.testTag("restore_confirm_dialog"),
       title = { Text(stringResource(R.string.backup_restore_dialog_title)) },
       text = {
@@ -913,12 +1070,24 @@ fun SettingsScreen(
             .heightIn(min = 48.dp)
             .testTag("restore_confirm_button"),
         ) {
-          Text(stringResource(R.string.backup_restore_confirm_button))
+          if (isBackupBusy) {
+            CircularProgressIndicator(
+              modifier = Modifier
+                .padding(end = 8.dp)
+                .size(16.dp),
+              strokeWidth = 2.dp,
+              color = MaterialTheme.colorScheme.onPrimary,
+            )
+            Text(stringResource(R.string.backup_restore_in_progress))
+          } else {
+            Text(stringResource(R.string.backup_restore_confirm_button))
+          }
         }
       },
       dismissButton = {
         TextButton(
           onClick = viewModel::dismissPendingRestore,
+          enabled = !isBackupBusy,
           modifier = Modifier.heightIn(min = 48.dp),
         ) {
           Text(stringResource(R.string.action_cancel))

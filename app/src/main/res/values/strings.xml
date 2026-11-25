@@ -103,6 +103,7 @@
     <string name="measurement_optional_section">Optional Measurements</string>
     <string name="measurement_range_error_hint">%1$s–%2$s in</string>
     <string name="measurement_required_error_hint">Required</string>
+    <string name="measurement_optional_hint">Optional</string>
     <string name="keypad_next">Next</string>
     <string name="keypad_done">Done</string>
     <string name="keypad_hide_cd">Hide measurement keypad</string>
@@ -125,6 +126,7 @@
     <string name="style_daman">Daman</string>
     <string name="style_pockets">Pockets</string>
     <string name="style_sleeves">Sleeves</string>
+    <string name="style_shoulder">Shoulder Type</string>
     <string name="style_silai">Silai</string>
     <string name="style_shalwar">Shalwar Type</string>
     <string name="measurement_save">Save Measurements</string>
@@ -265,11 +267,19 @@
 
     <!-- Milestone 8: JSON Backup & Restore -->
     <string name="settings_backup_section">Data Backup &amp; Restore</string>
-    <string name="settings_backup_desc">Export all customers, measurements, orders, and PKR payments to a JSON file or restore from a saved backup.</string>
+    <string name="settings_backup_desc">Export all customers, measurements, orders, and PKR payments to JSON, or import from a JSON backup or Google Sheets CSV file.</string>
     <string name="settings_export_backup">Export JSON Backup</string>
-    <string name="settings_restore_backup">Restore from Backup</string>
+    <string name="settings_restore_backup">Import JSON / CSV</string>
+    <string name="settings_import_bundled_sheet">Import Google Sheet (97 Customers)</string>
+    <string name="settings_import_bundled_sheet_2">Import Google Sheet 2 (874 Customers)</string>
+    <string name="settings_import_bundled_sheet_3">Import Google Sheet 3 (573 Customers)</string>
+    <string name="settings_import_bundled_sheet_4">Import Google Sheet 4 (681 Customers)</string>
+    <string name="settings_import_bundled_sheet_5">Import Google Sheet 5 (628 Customers)</string>
+    <string name="settings_import_bundled_sheet_6">Import Google Sheet 6 (503 Customers)</string>
     <string name="backup_restore_dialog_title">Restore Shop Backup?</string>
     <string name="backup_restore_confirm_button">Restore Backup</string>
+    <string name="backup_restore_in_progress">Restoring…</string>
+    <string name="settings_backup_processing">Processing backup file…</string>
 
     <string name="order_preview_customer_button">Preview Customer</string>
     <string name="order_preview_karigar_button">Preview Karigar</string>
@@ -350,6 +360,7 @@
     <string name="customers_sort_oldest">Oldest First</string>
     <string name="customers_sort_name">Name (A–Z)</string>
     <string name="customers_filter_with_address">With Address Only</string>
+    <string name="customers_filter_without_measurements">Without Measurements</string>
 
     <!-- Orders & Order Details Redesign -->
     <string name="orders_search_simple_hint">Search Orders…</string>
@@ -453,9 +464,12 @@
     <string name="style_opt_sleeve_single_cuff">Single Cuff</string>
     <string name="style_opt_sleeve_double_cuff">Double Cuff</string>
     <string name="style_opt_sleeve_studs">Stud Buttonhole</string>
+    <string name="style_opt_shoulder_down">Down Shoulder</string>
+    <string name="style_opt_shoulder_hanger">Hanger Shoulder</string>
+    <string name="style_opt_shoulder_full_down">Full Down Shoulder</string>
     <string name="style_opt_silai_single">Single Silai</string>
     <string name="style_opt_silai_double">Double Silai</string>
-    <string name="style_opt_silai_chamak">Chamak Dhaga</string>
+    <string name="style_opt_silai_kamdo">Kamando Dhaga</string>
     <string name="style_opt_shalwar_smart">Smart</string>
     <string name="style_opt_shalwar_normal">Normal</string>
     <string name="style_opt_shalwar_panjama">Panjama</string>
@@ -545,4 +559,26 @@
     <string name="auth_error_reset_email_required">Enter your email address above first to receive a reset link.</string>
     <string name="auth_info_reset_sent">Password reset link sent to %1$s.</string>
     <string name="auth_error_reset_failed">Could not send password reset email.</string>
+
+    <string name="sync_status_error">Sync Error</string>
+    <string name="sync_order_logs_section">Order Sync Status Log</string>
+    <string name="sync_order_logs_empty">No order sync activity recorded yet.</string>
+    <string name="sync_order_logs_clear">Clear Logs</string>
+    <string name="sync_log_order_number">Order #%1$d</string>
+    <string name="sync_log_order_pending">Order (%1$s)</string>
+    <string name="sync_log_status_queued">Queued</string>
+    <string name="sync_log_status_attempting">Syncing</string>
+    <string name="sync_log_status_succeeded">Synced</string>
+    <string name="sync_log_status_failed">Failed</string>
+    <string name="sync_log_status_conflict">Conflict</string>
+    <string name="sync_log_status_remote_applied">From Cloud</string>
+    <string name="sync_log_status_skipped">Skipped</string>
+    <string name="sync_log_op_create">Create</string>
+    <string name="sync_log_op_payment">Payment</string>
+    <string name="sync_log_op_status">Status</string>
+    <string name="sync_log_op_delete">Delete</string>
+    <string name="sync_log_op_order_number">Order #</string>
+    <string name="sync_log_op_update">Update</string>
+    <string name="sync_log_op_remote">Cloud Sync</string>
+    <string name="sync_logs_cleared_msg">Order sync logs cleared.</string>
 </resources>

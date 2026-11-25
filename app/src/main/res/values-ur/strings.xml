@@ -103,6 +103,7 @@
     <string name="measurement_optional_section">اختیاری ناپ</string>
     <string name="measurement_range_error_hint">%1$s–%2$s انچ</string>
     <string name="measurement_required_error_hint">لازمی</string>
+    <string name="measurement_optional_hint">اختیاری</string>
     <string name="keypad_next">اگلا</string>
     <string name="keypad_done">مکمل</string>
     <string name="keypad_hide_cd">کی بورڈ چھپائیں</string>
@@ -125,6 +126,7 @@
     <string name="style_daman">دامن</string>
     <string name="style_pockets">جیبیں</string>
     <string name="style_sleeves">آستین</string>
+    <string name="style_shoulder">کندھے کی قسم</string>
     <string name="style_silai">سلائی</string>
     <string name="style_shalwar">شلوار کی قسم</string>
     <string name="measurement_save">ناپ محفوظ کریں</string>
@@ -265,11 +267,19 @@
 
     <!-- JSON Backup & Restore -->
     <string name="settings_backup_section">ڈیٹا بیک اپ اور بحالی</string>
-    <string name="settings_backup_desc">تمام گاہک، ناپ، آرڈرز اور روپے کی ادائیگیاں JSON فائل میں محفوظ کریں یا بیک اپ سے بحال کریں۔</string>
+    <string name="settings_backup_desc">تمام گاہک، ناپ، آرڈرز اور روپے کی ادائیگیاں JSON میں محفوظ کریں، یا JSON بیک اپ / گوگل شیٹ CSV فائل درآمد کریں۔</string>
     <string name="settings_export_backup">بیک اپ محفوظ کریں (JSON)</string>
-    <string name="settings_restore_backup">بیک اپ بحال کریں</string>
+    <string name="settings_restore_backup">JSON / CSV درآمد کریں</string>
+    <string name="settings_import_bundled_sheet">گوگل شیٹ گاہک درآمد کریں (97)</string>
+    <string name="settings_import_bundled_sheet_2">گوگل شیٹ 2 درآمد کریں (874 گاہک)</string>
+    <string name="settings_import_bundled_sheet_3">گوگل شیٹ 3 درآمد کریں (573 گاہک)</string>
+    <string name="settings_import_bundled_sheet_4">گوگل شیٹ 4 درآمد کریں (681 گاہک)</string>
+    <string name="settings_import_bundled_sheet_5">گوگل شیٹ 5 درآمد کریں (628 گاہک)</string>
+    <string name="settings_import_bundled_sheet_6">گوگل شیٹ 6 درآمد کریں (503 گاہک)</string>
     <string name="backup_restore_dialog_title">دکان کا بیک اپ بحال کریں؟</string>
     <string name="backup_restore_confirm_button">بیک اپ بحال کریں</string>
+    <string name="backup_restore_in_progress">بحال ہو رہا ہے…</string>
+    <string name="settings_backup_processing">بیک اپ فائل پر کارروائی ہو رہی ہے…</string>
 
     <string name="order_preview_customer_button">گاہک رسید دیکھیں</string>
     <string name="order_preview_karigar_button">کاریگر پرچی دیکھیں</string>
@@ -350,6 +360,7 @@
     <string name="customers_sort_oldest">پرانے پہلے</string>
     <string name="customers_sort_name">نام کے مطابق</string>
     <string name="customers_filter_with_address">صرف پتے والے</string>
+    <string name="customers_filter_without_measurements">بغیر ناپ والے</string>
 
     <!-- Orders & Order Details Redesign -->
     <string name="orders_search_simple_hint">آرڈرز تلاش کریں…</string>
@@ -453,9 +464,12 @@
     <string name="style_opt_sleeve_single_cuff">سنگل کف</string>
     <string name="style_opt_sleeve_double_cuff">ڈبل کف</string>
     <string name="style_opt_sleeve_studs">اسٹڈ کاج</string>
+    <string name="style_opt_shoulder_down">ڈاؤن شولڈر</string>
+    <string name="style_opt_shoulder_hanger">ہینگر شولڈر</string>
+    <string name="style_opt_shoulder_full_down">فل ڈاؤن شولڈر</string>
     <string name="style_opt_silai_single">سنگل سلائی</string>
     <string name="style_opt_silai_double">ڈبل سلائی</string>
-    <string name="style_opt_silai_chamak">چمک دھاگہ</string>
+    <string name="style_opt_silai_kamdo">کمانڈودھاگہ</string>
     <string name="style_opt_shalwar_smart">سمارٹ</string>
     <string name="style_opt_shalwar_normal">نارمل</string>
     <string name="style_opt_shalwar_panjama">پاجامہ</string>
@@ -545,4 +559,26 @@
     <string name="auth_error_reset_email_required">ری سیٹ لنک حاصل کرنے کے لیے پہلے اوپر اپنا ای میل پتہ درج کریں۔</string>
     <string name="auth_info_reset_sent">پاس ورڈ ری سیٹ لنک %1$s پر بھیج دیا گیا ہے۔</string>
     <string name="auth_error_reset_failed">پاس ورڈ ری سیٹ ای میل نہیں بھیجی جا سکی۔</string>
+
+    <string name="sync_status_error">سنک میں خرابی</string>
+    <string name="sync_order_logs_section">آرڈر سنک سٹیٹس لاگ</string>
+    <string name="sync_order_logs_empty">ابھی کوئی آرڈر سنک سرگرمی درج نہیں ہوئی۔</string>
+    <string name="sync_order_logs_clear">لاگ صاف کریں</string>
+    <string name="sync_log_order_number">آرڈر #%1$d</string>
+    <string name="sync_log_order_pending">آرڈر (%1$s)</string>
+    <string name="sync_log_status_queued">قطار میں</string>
+    <string name="sync_log_status_attempting">سنک جاری</string>
+    <string name="sync_log_status_succeeded">مکمل</string>
+    <string name="sync_log_status_failed">ناکام</string>
+    <string name="sync_log_status_conflict">تضاد</string>
+    <string name="sync_log_status_remote_applied">کلاؤڈ سے</string>
+    <string name="sync_log_status_skipped">موخر</string>
+    <string name="sync_log_op_create">نیا آرڈر</string>
+    <string name="sync_log_op_payment">ادائیگی</string>
+    <string name="sync_log_op_status">حالت</string>
+    <string name="sync_log_op_delete">حذف</string>
+    <string name="sync_log_op_order_number">آرڈر نمبر</string>
+    <string name="sync_log_op_update">اپ ڈیٹ</string>
+    <string name="sync_log_op_remote">کلاؤڈ سنک</string>
+    <string name="sync_logs_cleared_msg">آرڈر سنک لاگز صاف کر دیے گئے۔</string>
 </resources>

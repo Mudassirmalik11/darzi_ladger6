@@ -4,22 +4,20 @@ import java.util.Locale
 
 enum class MeasurementFieldKey(
   val testTag: String,
-  val minInches: Double,
-  val maxInches: Double,
   val isRequired: Boolean,
 ) {
-  KAMEEZ_LAMBAI("meas_kameez_lambai", 20.0, 60.0, isRequired = true),
-  TERA("meas_tera", 10.0, 30.0, isRequired = true),
-  BAZU("meas_bazu", 12.0, 35.0, isRequired = true),
-  GALA_COLLAR("meas_gala_collar", 10.0, 25.0, isRequired = true),
-  CHATI("meas_chati", 15.0, 65.0, isRequired = true),
-  GHERA_DAMAN("meas_ghera_daman", 15.0, 65.0, isRequired = true),
-  SHALWAR_LAMBAI("meas_shalwar_lambai", 20.0, 55.0, isRequired = true),
-  PAINCHA("meas_paincha", 4.0, 20.0, isRequired = true),
-  KAMAR("meas_kamar", 14.0, 65.0, isRequired = false),
-  CUFF("meas_cuff", 2.0, 15.0, isRequired = false),
-  GHERA_ASAN("meas_ghera_asan", 10.0, 60.0, isRequired = false),
-  SHALWAR_GHAIR("meas_shalwar_ghair", 20.0, 130.0, isRequired = false);
+  KAMEEZ_LAMBAI("meas_kameez_lambai", isRequired = true),
+  TERA("meas_tera", isRequired = true),
+  BAZU("meas_bazu", isRequired = true),
+  GALA_COLLAR("meas_gala_collar", isRequired = true),
+  CHATI("meas_chati", isRequired = true),
+  GHERA_DAMAN("meas_ghera_daman", isRequired = true),
+  SHALWAR_LAMBAI("meas_shalwar_lambai", isRequired = true),
+  PAINCHA("meas_paincha", isRequired = true),
+  KAMAR("meas_kamar", isRequired = false),
+  CUFF("meas_cuff", isRequired = false),
+  GHERA_ASAN("meas_ghera_asan", isRequired = false),
+  SHALWAR_GHAIR("meas_shalwar_ghair", isRequired = false);
 
   fun label(urdu: Boolean): String = when (this) {
     KAMEEZ_LAMBAI -> if (urdu) "قمیض لمبائی" else "Kameez Lambai"
@@ -58,7 +56,7 @@ object TailorValidators {
     if (!trimmed.contains('/') && !trimmed.contains(' ') && !trimmed.contains('-')) {
       if (trimmed.endsWith('.')) return null
       val value = trimmed.toDoubleOrNull() ?: return null
-      if (!value.isFinite()) return null
+      if (!value.isFinite() || value < 0.0) return null
       return ParsedMeasurementDetails(primary = value)
     }
 
@@ -70,7 +68,7 @@ object TailorValidators {
       val dualMatch = dualSlashRegex.matchEntire(trimmed) ?: return null
       val first = dualMatch.groupValues[1].toDoubleOrNull() ?: return null
       val second = dualMatch.groupValues[2].toDoubleOrNull() ?: return null
-      if (!first.isFinite() || !second.isFinite() || second <= 0.0 || second > 200.0) {
+      if (!first.isFinite() || !second.isFinite() || first < 0.0 || second <= 0.0) {
         return null
       }
       return ParsedMeasurementDetails(
@@ -84,7 +82,7 @@ object TailorValidators {
     val whole = match.groupValues[1].toDoubleOrNull() ?: return null
     val frac = parseFractionPart(match.groupValues[2]) ?: return null
     val sum = whole + frac
-    if (!sum.isFinite()) return null
+    if (!sum.isFinite() || sum < 0.0) return null
     return ParsedMeasurementDetails(primary = sum)
   }
 
@@ -100,8 +98,12 @@ object TailorValidators {
   fun buildRawValuesMap(entries: List<Pair<MeasurementFieldKey, String>>): Map<String, String> =
     buildMap {
       entries.forEach { (key, raw) ->
-        normalizeRawDualValue(raw)?.let { normalized ->
-          put(key.name, normalized)
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return@forEach
+        val details = parseMeasurementDetails(trimmed) ?: return@forEach
+        when {
+          details.isDualSlash -> put(key.name, trimmed)
+          details.primary == 0.0 -> put(key.name, "0")
         }
       }
     }
@@ -111,13 +113,9 @@ object TailorValidators {
     if (pieces.size != 2) return null
     val numerator = pieces[0].toDoubleOrNull() ?: return null
     val denominator = pieces[1].toDoubleOrNull() ?: return null
-    if (denominator <= 0.0 || !numerator.isFinite() || !denominator.isFinite()) return null
+    if (denominator <= 0.0 || numerator < 0.0 || !numerator.isFinite() || !denominator.isFinite()) return null
     return numerator / denominator
   }
-
-  fun formatLimitNumber(value: Double): String =
-    if (value % 1.0 == 0.0) value.toInt().toString()
-    else value.toString().trimEnd('0').trimEnd('.')
 
   fun validateMeasurementFieldInput(
     key: MeasurementFieldKey,
@@ -127,8 +125,6 @@ object TailorValidators {
     val urdu = isUrdu()
     val trimmed = rawText.trim()
     val label = key.label(urdu)
-    val minStr = formatLimitNumber(key.minInches)
-    val maxStr = formatLimitNumber(key.maxInches)
 
     if (trimmed.isEmpty()) {
       if (!key.isRequired || allowBlankRequired) return null
@@ -137,20 +133,16 @@ object TailorValidators {
 
     val details = parseMeasurementDetails(trimmed)
       ?: return if (urdu) {
-        "درست عدد درج کریں ($minStr–$maxStr انچ)۔"
+        "درست عدد درج کریں (مثلاً 0، 41.5 یا 8/10)۔"
       } else {
-        "Enter valid value ($minStr–$maxStr in)."
+        "Enter a valid value (e.g. 0, 41.5, or 8/10)."
       }
 
-    if (!key.isRequired && !details.isDualSlash && details.primary == 0.0) {
-      return null
-    }
-
-    if (details.primary < key.minInches || details.primary > key.maxInches) {
+    if (details.primary < 0.0) {
       return if (urdu) {
-        "$label $minStr سے $maxStr انچ کے درمیان ہونا چاہیے۔"
+        "$label منفی نہیں ہو سکتا۔"
       } else {
-        "$label must be $minStr–$maxStr in."
+        "$label cannot be negative."
       }
     }
     return null
@@ -191,27 +183,12 @@ object TailorValidators {
       MeasurementFieldKey.SHALWAR_GHAIR to snapshot.shalwarGhair,
     )
     for ((key, value) in fields) {
-      if (value.isNaN() || value.isInfinite()) {
+      if (value.isNaN() || value.isInfinite() || value < 0.0) {
         val label = key.label(urdu)
-        val minStr = formatLimitNumber(key.minInches)
-        val maxStr = formatLimitNumber(key.maxInches)
         return if (urdu) {
-          "$label $minStr سے $maxStr انچ کے درمیان ہونا چاہیے۔"
+          "$label 0 یا اس سے زیادہ ہونا چاہیے۔"
         } else {
-          "$label must be between $minStr and $maxStr inches."
-        }
-      }
-      if (!key.isRequired && value == 0.0) {
-        continue
-      }
-      if (value < key.minInches || value > key.maxInches) {
-        val label = key.label(urdu)
-        val minStr = formatLimitNumber(key.minInches)
-        val maxStr = formatLimitNumber(key.maxInches)
-        return if (urdu) {
-          "$label $minStr سے $maxStr انچ کے درمیان ہونا چاہیے۔"
-        } else {
-          "$label must be between $minStr and $maxStr inches."
+          "$label must be 0 or greater."
         }
       }
     }

@@ -194,6 +194,89 @@ class ShopBackupRepositoryTest {
     assertEquals("Faisal Khan", database.customerDao().getById(existing.customerId)?.name)
     assertEquals(null, database.customerDao().getById("cust-new"))
   }
+
+  @Test
+  fun `restoreFromJson stamps active local deviceId and preserves customId and zero missing measurements`() = runBlocking {
+    val deviceRepo = com.example.data.local.repository.DeviceSyncRepository(database)
+    val localDevice = deviceRepo.ensureLocalDeviceConfig()
+
+    val csvImportedBundleJson = """
+      {
+        "schemaVersion": 1,
+        "appId": "darzi_ledger",
+        "exportedAtMillis": 1763830100000,
+        "customers": [{
+          "customerId": "csv_cust_001",
+          "shopId": "default_shop",
+          "name": "سراےڈی طارق صاحب",
+          "phone": "0300-7387915",
+          "normalizedPhone": "03007387915",
+          "customId": "No.4",
+          "createdAt": 1763830001000,
+          "updatedAt": 1763830001000,
+          "lastModifiedByDevice": "csv-import"
+        }],
+        "measurements": [{
+          "measurementId": "csv_meas_001",
+          "customerId": "csv_cust_001",
+          "kameezLambai": 39.0,
+          "tera": 19.0,
+          "bazu": 24.0,
+          "chati": 46.0,
+          "kamar": 0.0,
+          "gheraDaman": 30.0,
+          "galaCollar": 17.5,
+          "cuff": 7.0,
+          "shalwarLambai": 0.0,
+          "paincha": 0.0,
+          "gheraAsan": 0.0,
+          "createdAt": 1763830001000,
+          "updatedAt": 1763830001000,
+          "lastModifiedByDevice": "csv-import"
+        }]
+      }
+    """.trimIndent()
+
+    val report = backupRepo.restoreFromJson(csvImportedBundleJson, enqueueSync = true).getOrThrow()
+    assertEquals(1, report.customersRestored)
+    assertEquals(1, report.measurementsRestored)
+
+    val restoredCustomer = database.customerDao().getById("csv_cust_001")!!
+    assertEquals("No.4", restoredCustomer.customId)
+    assertEquals(localDevice.deviceId, restoredCustomer.lastModifiedByDevice)
+
+    val restoredMeas = database.measurementDao().getById("csv_meas_001")!!
+    assertEquals(localDevice.deviceId, restoredMeas.lastModifiedByDevice)
+    assertEquals(0.0, restoredMeas.shalwarLambai, 0.001)
+    assertEquals("—", com.example.core.ui.DateFormatUtils.formatInches(restoredMeas.shalwarLambai))
+    assertEquals("39\"", com.example.core.ui.DateFormatUtils.formatInches(restoredMeas.kameezLambai))
+    assertTrue(database.syncOutboxDao().getAllEvents().any { it.entityId == "csv_cust_001" })
+    assertTrue(database.syncOutboxDao().getAllEvents().any { it.entityId == "csv_meas_001" })
+  }
+
+  @Test
+  fun `bulk restoreFromJson of Sheet 4 enqueues all records in strict dependency order`() = runBlocking {
+    val assetFile = java.io.File("src/main/assets/google_sheet_600_backup.json")
+      .takeIf { it.exists() }
+      ?: java.io.File("app/src/main/assets/google_sheet_600_backup.json")
+    assertTrue("Expected google_sheet_600_backup.json to exist", assetFile.exists())
+
+    val rawJson = assetFile.readText(Charsets.UTF_8)
+    val report = backupRepo.restoreFromJson(rawJson, enqueueSync = true, nowMillis = 2_000_000L).getOrThrow()
+
+    assertEquals(681, report.customersRestored)
+    assertEquals(648, report.measurementsRestored)
+    assertEquals(681, database.customerDao().getAllIds().size)
+    assertEquals(648, database.measurementDao().getAllIds().size)
+
+    // Verify first batch pulled from SQLite contains SHOP + CUSTOMERs first, never orphaned MEASUREMENTs
+    val firstBatch = database.syncOutboxDao().getReadyEvents(nowMillis = 2_000_100L, limit = 300)
+    assertEquals(300, firstBatch.size)
+    assertEquals(com.example.core.model.SyncEntityType.SHOP, firstBatch.first().entityType)
+    assertTrue(
+      firstBatch.drop(1).all { it.entityType == com.example.core.model.SyncEntityType.CUSTOMER },
+    )
+  }
 }
 
 @RunWith(RobolectricTestRunner::class)

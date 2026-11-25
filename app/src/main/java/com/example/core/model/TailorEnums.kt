@@ -84,10 +84,48 @@ enum class ShalwarType(val displayName: String) {
 }
 
 @Serializable
+enum class ShoulderType(val displayName: String) {
+  DOWN_SHOULDER("Down Shoulder"),
+  HANGER_SHOULDER("Hanger Shoulder"),
+  FULL_DOWN_SHOULDER("Full Down Shoulder"),
+}
+
+@Serializable(with = SilaiStyleSerializer::class)
 enum class SilaiStyle(val displayName: String) {
   SINGLE("Single"),
   DOUBLE("Double"),
-  CHAMAK_DHAGA("Chamak Dhaga"),
+  KAMDO_DHAGA("Kamdo Dhaga");
+
+  companion object {
+    fun fromRaw(raw: String?): SilaiStyle? {
+      val clean = raw?.trim().orEmpty()
+      if (clean.isEmpty()) return null
+      if (clean == "CHAMAK_DHAGA") return KAMDO_DHAGA
+      return entries.firstOrNull { it.name == clean }
+    }
+  }
+}
+
+object SilaiStyleSerializer : kotlinx.serialization.KSerializer<SilaiStyle> {
+  override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+    kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+      "SilaiStyle",
+      kotlinx.serialization.descriptors.PrimitiveKind.STRING,
+    )
+
+  override fun serialize(
+    encoder: kotlinx.serialization.encoding.Encoder,
+    value: SilaiStyle,
+  ) {
+    encoder.encodeString(value.name)
+  }
+
+  override fun deserialize(
+    decoder: kotlinx.serialization.encoding.Decoder,
+  ): SilaiStyle {
+    val raw = decoder.decodeString()
+    return SilaiStyle.fromRaw(raw) ?: SilaiStyle.SINGLE
+  }
 }
 
 @Serializable

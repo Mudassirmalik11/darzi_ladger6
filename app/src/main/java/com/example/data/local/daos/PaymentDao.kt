@@ -60,8 +60,20 @@ interface PaymentDao {
   @Insert(onConflict = OnConflictStrategy.ABORT)
   suspend fun insert(payment: PaymentEntity)
 
+  @Insert(onConflict = OnConflictStrategy.IGNORE)
+  suspend fun insertAll(payments: List<PaymentEntity>)
+
   @Upsert
   suspend fun upsertForRestore(payment: PaymentEntity)
+
+  @Upsert
+  suspend fun upsertAllForRestore(payments: List<PaymentEntity>)
+
+  @Query("SELECT paymentId FROM payments")
+  suspend fun getAllIds(): List<String>
+
+  @Query("SELECT paymentId FROM payments WHERE paymentId IN (:paymentIds)")
+  suspend fun getExistingIds(paymentIds: List<String>): List<String>
 
   @Query("SELECT * FROM payments ORDER BY createdAt ASC")
   suspend fun getAllForBackup(): List<PaymentEntity>

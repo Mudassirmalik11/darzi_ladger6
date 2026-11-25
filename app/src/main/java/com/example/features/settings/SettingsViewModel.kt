@@ -358,35 +358,83 @@ class SettingsViewModel(
     viewModelScope.launch {
       _isBackupBusy.value = true
       _backupError.value = null
-      val readResult = runCatching {
-        withContext(Dispatchers.IO) {
-          context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use {
+      try {
+        val prepared = withContext(Dispatchers.IO) {
+          val raw = context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use {
             it.readText()
           } ?: error(localizedText("Could not read selected backup file.", "منتخب بیک اپ فائل پڑھی نہیں جا سکی۔"))
+          withContext(Dispatchers.Default) {
+            val trimmed = raw.removePrefix("\uFEFF").trimStart()
+            val rawJson = if (trimmed.startsWith("{")) {
+              raw
+            } else {
+              shopBackupRepository.convertCsvToBackupJson(raw).getOrThrow()
+            }
+            val summary = shopBackupRepository.inspectBackupSummary(rawJson).getOrThrow()
+            PendingBackupRestore(rawJson = rawJson, summary = summary)
+          }
         }
+        _pendingRestore.value = prepared
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        _backupError.value = e.message
+          ?: localizedText("CSV or JSON import failed.", "فائل درآمد نہیں ہو سکی۔")
+      } finally {
+        _isBackupBusy.value = false
       }
-      _isBackupBusy.value = false
-      readResult.fold(
-        onSuccess = { raw -> previewRestoreJson(raw) },
-        onFailure = { err ->
-          _backupError.value = err.message
-            ?: localizedText("Could not open backup file.", "بیک اپ فائل کھولی نہیں جا سکی۔")
-        },
-      )
+    }
+  }
+
+  fun previewBundledSheetBackup(
+    context: Context,
+    assetFileName: String = "google_sheet_customers_backup.json",
+  ) {
+    if (_isBackupBusy.value) return
+    viewModelScope.launch {
+      _isBackupBusy.value = true
+      _backupError.value = null
+      try {
+        val prepared = withContext(Dispatchers.IO) {
+          val raw = context.assets.open(assetFileName)
+            .bufferedReader(Charsets.UTF_8)
+            .use { it.readText() }
+          withContext(Dispatchers.Default) {
+            val summary = shopBackupRepository.inspectBackupSummary(raw).getOrThrow()
+            PendingBackupRestore(rawJson = raw, summary = summary)
+          }
+        }
+        _pendingRestore.value = prepared
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        _backupError.value = e.message
+          ?: localizedText("Could not load bundled sheet data.", "شامل شدہ شیٹ ڈیٹا لوڈ نہیں ہو سکا۔")
+      } finally {
+        _isBackupBusy.value = false
+      }
     }
   }
 
   fun previewRestoreJson(rawJson: String) {
-    _backupError.value = null
-    shopBackupRepository.inspectBackupSummary(rawJson).fold(
-      onSuccess = { summary ->
+    if (_isBackupBusy.value) return
+    viewModelScope.launch {
+      _isBackupBusy.value = true
+      _backupError.value = null
+      try {
+        val summary = withContext(Dispatchers.Default) {
+          shopBackupRepository.inspectBackupSummary(rawJson).getOrThrow()
+        }
         _pendingRestore.value = PendingBackupRestore(rawJson = rawJson, summary = summary)
-      },
-      onFailure = { err ->
-        _backupError.value = err.message
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        _backupError.value = e.message
           ?: localizedText("Backup validation failed.", "بیک اپ فائل کی تصدیق ناکام ہوگئی۔")
-      },
-    )
+      } finally {
+        _isBackupBusy.value = false
+      }
+    }
   }
 
   fun confirmPendingRestore() {
@@ -395,24 +443,27 @@ class SettingsViewModel(
     viewModelScope.launch {
       _isBackupBusy.value = true
       _backupError.value = null
-      val result = shopBackupRepository.restoreFromJson(pending.rawJson)
-      _isBackupBusy.value = false
-      result.fold(
-        onSuccess = { report ->
-          _pendingRestore.value = null
-          _deviceActionMessage.value = localizedText(
-            "Restored ${report.customersRestored} customers, ${report.ordersRestored} orders, ${report.paymentsRestored} payments.",
-            "${report.customersRestored} گاہک، ${report.ordersRestored} آرڈرز اور ${report.paymentsRestored} ادائیگیاں بحال ہو گئیں۔",
-          )
-        },
-        onFailure = { err ->
-          _pendingRestore.value = null
-          _backupError.value = err.message ?: localizedText(
-            "Restore failed; existing shop data was preserved.",
-            "بحالی ناکام رہی؛ دکان کا موجودہ ڈیٹا محفوظ رکھا گیا ہے۔",
-          )
-        },
-      )
+      try {
+        val result = shopBackupRepository.restoreFromJson(pending.rawJson)
+        result.fold(
+          onSuccess = { report ->
+            _pendingRestore.value = null
+            _deviceActionMessage.value = localizedText(
+              "Restored ${report.customersRestored} customers, ${report.measurementsRestored} measurements, ${report.ordersRestored} orders, ${report.paymentsRestored} payments.",
+              "${report.customersRestored} گاہک، ${report.measurementsRestored} ناپ، ${report.ordersRestored} آرڈرز اور ${report.paymentsRestored} ادائیگیاں بحال ہو گئیں۔",
+            )
+          },
+          onFailure = { err ->
+            _pendingRestore.value = null
+            _backupError.value = err.message ?: localizedText(
+              "Restore failed; existing shop data was preserved.",
+              "بحالی ناکام رہی؛ دکان کا موجودہ ڈیٹا محفوظ رکھا گیا ہے۔",
+            )
+          },
+        )
+      } finally {
+        _isBackupBusy.value = false
+      }
     }
   }
 

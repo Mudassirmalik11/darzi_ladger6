@@ -130,8 +130,9 @@ function measurementPayload(uid = ALICE_UID, customerId = "cust_1", deviceId = P
     damanStyle: "GOL",
     pocketStyle: "TWO_SIDE",
     sleeveStyle: "KAF",
-    silaiStyle: "DOUBLE",
+    silaiStyle: "KAMDO_DHAGA",
     shalwarType: "BALOCHI",
+    shoulderType: "DOWN_SHOULDER",
     rawInputsJson: "{\"bazu\":\"23/12\"}",
     notes: "Soft canvas collar",
     version: 1,
@@ -178,8 +179,9 @@ function orderPayload(uid = ALICE_UID, customerId = "cust_1", deviceId = PHONE_I
       damanStyle: "GOL",
       pocketStyle: "TWO_SIDE",
       sleeveStyle: "KURTA",
-      silaiStyle: "DOUBLE",
+      silaiStyle: "KAMDO_DHAGA",
       shalwarType: "PANJAMA",
+      shoulderType: "HANGER_SHOULDER",
     },
     notes: "Urgent stitch",
     version: 1,
@@ -359,11 +361,21 @@ test("Full domain relational chain: customer -> measurement -> order -> append-o
     shopRef.collection("customers").doc("cust_1").set(customerPayload(ALICE_UID, PHONE_ID))
   );
 
-  // Create measurement (including optional kamar/cuff/gheraAsan = 0, and reject compulsory = 0)
+  // Create measurement: 0, large values (788), floats, and 8/10 dual-slash are allowed; negative values fail
   await assertFails(
-    shopRef.collection("measurements").doc("meas_bad").set({
+    shopRef.collection("measurements").doc("meas_bad_negative").set({
+      ...measurementPayload(ALICE_UID, "cust_1", PHONE_ID),
+      kameezLambai: -1,
+    })
+  );
+  await assertSucceeds(
+    shopRef.collection("measurements").doc("meas_compulsory_zero_and_large").set({
       ...measurementPayload(ALICE_UID, "cust_1", PHONE_ID),
       kameezLambai: 0,
+      tera: 788,
+      bazu: 8,
+      chati: 0.5,
+      rawInputsJson: "{\"KAMEEZ_LAMBAI\":\"0\",\"BAZU\":\"8/10\"}",
     })
   );
   await assertSucceeds(
@@ -383,6 +395,8 @@ test("Full domain relational chain: customer -> measurement -> order -> append-o
     shopRef.collection("measurements").doc("meas_1").update({
       shalwarGhair: 52.5,
       shalwarType: "SMART",
+      shoulderType: "FULL_DOWN_SHOULDER",
+      silaiStyle: "CHAMAK_DHAGA",
       sleeveStyle: "KURTA",
       rawInputsJson: "{\"bazu\":\"23/12\",\"paincha\":\"7.5/8\"}",
       version: 2,
@@ -400,6 +414,7 @@ test("Full domain relational chain: customer -> measurement -> order -> append-o
       sleeveStyle: "",
       silaiStyle: "",
       shalwarType: "",
+      shoulderType: "",
     })
   );
   await assertFails(
@@ -415,9 +430,21 @@ test("Full domain relational chain: customer -> measurement -> order -> append-o
     })
   );
   await assertFails(
-    shopRef.collection("measurements").doc("meas_invalid_shalwar_ghair").set({
+    shopRef.collection("measurements").doc("meas_invalid_shoulder_type").set({
+      ...measurementPayload(ALICE_UID, "cust_1", PHONE_ID),
+      shoulderType: "INVALID_SHOULDER",
+    })
+  );
+  await assertSucceeds(
+    shopRef.collection("measurements").doc("meas_unbounded_shalwar_ghair").set({
       ...measurementPayload(ALICE_UID, "cust_1", PHONE_ID),
       shalwarGhair: 250,
+    })
+  );
+  await assertFails(
+    shopRef.collection("measurements").doc("meas_negative_shalwar_ghair").set({
+      ...measurementPayload(ALICE_UID, "cust_1", PHONE_ID),
+      shalwarGhair: -0.5,
     })
   );
 
@@ -435,6 +462,37 @@ test("Full domain relational chain: customer -> measurement -> order -> append-o
         sleeveStyle: "",
         silaiStyle: "",
         shalwarType: "",
+        shoulderType: "",
+      },
+    })
+  );
+  await assertFails(
+    shopRef.collection("orders").doc("order_invalid_shoulder_type").set({
+      ...orderPayload(ALICE_UID, "cust_1", PHONE_ID, 1005),
+      styleSnapshot: {
+        ...orderPayload(ALICE_UID, "cust_1", PHONE_ID, 1005).styleSnapshot,
+        shoulderType: "INVALID_SHOULDER",
+      },
+    })
+  );
+  await assertSucceeds(
+    shopRef.collection("orders").doc("order_custom_measurements").set({
+      ...orderPayload(ALICE_UID, "cust_1", PHONE_ID, 1003),
+      measurementSnapshot: {
+        ...orderPayload(ALICE_UID, "cust_1", PHONE_ID, 1003).measurementSnapshot,
+        kameezLambai: 0,
+        tera: 788.5,
+        bazu: 8,
+        rawInputsJson: "{\"KAMEEZ_LAMBAI\":\"0\",\"BAZU\":\"8/10\"}",
+      },
+    })
+  );
+  await assertFails(
+    shopRef.collection("orders").doc("order_negative_measurement").set({
+      ...orderPayload(ALICE_UID, "cust_1", PHONE_ID, 1004),
+      measurementSnapshot: {
+        ...orderPayload(ALICE_UID, "cust_1", PHONE_ID, 1004).measurementSnapshot,
+        kameezLambai: -5,
       },
     })
   );
@@ -662,3 +720,171 @@ test("Single-device session transfer: owner and active staff can delete previous
   );
   await assertSucceeds(ownerTransferBatch.commit());
 });
+
+test("Order updates: mark paid, partial payments, orderNumber assignment, and soft-delete across all statuses", async () => {
+  await seedShopAndDevices();
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const staffDb = testEnv.authenticatedContext(STAFF_UID).firestore();
+  const shopRef = aliceDb.collection("shops").doc(ALICE_UID);
+
+  // Provision staff + staff device to verify staff order updates don't hit CEL expression limits
+  const staffBatch = aliceDb.batch();
+  staffBatch.set(shopRef.collection("staff_users").doc(STAFF_UID), staffUserPayload(ALICE_UID, STAFF_UID));
+  staffBatch.set(aliceDb.collection("staff_links").doc(STAFF_UID), staffLinkPayload(ALICE_UID, STAFF_UID));
+  await assertSucceeds(staffBatch.commit());
+  await assertSucceeds(
+    staffDb.collection("shops").doc(ALICE_UID).collection("devices").doc(STAFF_PHONE_ID)
+      .set(devicePayload(ALICE_UID, "PHONE", "AUTHORIZED", STAFF_UID, "staff1@alnoor.pk", "STAFF"))
+  );
+
+  // Seed customer + orders in PENDING, READY, DELIVERED, CANCELLED states + pending orderNumber
+  await assertSucceeds(shopRef.collection("customers").doc("cust_1").set(customerPayload(ALICE_UID, PHONE_ID)));
+  await assertSucceeds(shopRef.collection("orders").doc("order_pay").set({
+    ...orderPayload(ALICE_UID, "cust_1", PHONE_ID, 1101),
+    totalAmountPkr: 2000,
+    paidAmountPkr: 0,
+    remainingAmountPkr: 2000,
+    paymentStatus: "UNPAID",
+  }));
+  await assertSucceeds(shopRef.collection("orders").doc("order_no_num").set(orderPayload(ALICE_UID, "cust_1", PHONE_ID, null)));
+  await assertSucceeds(shopRef.collection("orders").doc("order_ready").set({
+    ...orderPayload(ALICE_UID, "cust_1", PHONE_ID, 1102),
+    orderStatus: "READY",
+  }));
+  await assertSucceeds(shopRef.collection("orders").doc("order_delivered").set({
+    ...orderPayload(ALICE_UID, "cust_1", PHONE_ID, 1103),
+    orderStatus: "DELIVERED",
+  }));
+  await assertSucceeds(shopRef.collection("orders").doc("order_cancelled").set({
+    ...orderPayload(ALICE_UID, "cust_1", PHONE_ID, 1104),
+    orderStatus: "CANCELLED",
+  }));
+
+  // 1. Mark order #1101 PAID using SyncMappers.orderPaymentUpdateMap shape
+  await assertSucceeds(
+    shopRef.collection("orders").doc("order_pay").update({
+      paidAmountPkr: 2000,
+      remainingAmountPkr: 0,
+      paymentStatus: "PAID",
+      version: 2,
+      lastModifiedByDevice: PHONE_ID,
+      updatedAtEpochMillis: Date.now(),
+      updatedAt: pastDate(400),
+    })
+  );
+
+  // 2. Assign pending orderNumber via orderDetailsUpdateMap
+  await assertSucceeds(
+    shopRef.collection("orders").doc("order_no_num").update({
+      orderNumber: 1105,
+      suitCount: 2,
+      deliveryDateMillis: Date.now() + 86400000 * 3,
+      orderStatus: "PENDING",
+      notes: "Urgent stitch",
+      version: 2,
+      lastModifiedByDevice: PHONE_ID,
+      deleted: false,
+      updatedAtEpochMillis: Date.now(),
+      updatedAt: pastDate(350),
+    })
+  );
+
+  // 3. Soft-delete 3 orders across PENDING, READY, DELIVERED, CANCELLED via orderDetailsUpdateMap
+  for (const [docId, status] of [
+    ["order_pay", "PENDING"],
+    ["order_ready", "READY"],
+    ["order_delivered", "DELIVERED"],
+    ["order_cancelled", "CANCELLED"],
+  ]) {
+    const existingSnap = await shopRef.collection("orders").doc(docId).get();
+    await assertSucceeds(
+      shopRef.collection("orders").doc(docId).update({
+        suitCount: existingSnap.get("suitCount"),
+        deliveryDateMillis: existingSnap.get("deliveryDateMillis"),
+        orderStatus: status,
+        notes: existingSnap.get("notes"),
+        version: 3,
+        lastModifiedByDevice: PHONE_ID,
+        deleted: true,
+        updatedAtEpochMillis: Date.now(),
+        updatedAt: pastDate(300),
+      })
+    );
+  }
+
+  // 4. Cannot resurrect/un-delete or edit notes on a CANCELLED order or record payment on CANCELLED order
+  await assertFails(
+    shopRef.collection("orders").doc("order_cancelled").update({
+      suitCount: 2,
+      deliveryDateMillis: Date.now() + 86400000 * 3,
+      orderStatus: "PENDING",
+      notes: "Reopened",
+      version: 4,
+      lastModifiedByDevice: PHONE_ID,
+      deleted: true,
+      updatedAtEpochMillis: Date.now(),
+      updatedAt: pastDate(250),
+    })
+  );
+  await assertFails(
+    shopRef.collection("orders").doc("order_cancelled").update({
+      paidAmountPkr: 5000,
+      remainingAmountPkr: 0,
+      paymentStatus: "PAID",
+      version: 4,
+      lastModifiedByDevice: PHONE_ID,
+      updatedAtEpochMillis: Date.now(),
+      updatedAt: pastDate(250),
+    })
+  );
+
+  // 5. Active staff member can also update orderStatus to READY via orderDetailsUpdateMap
+  await assertSucceeds(
+    staffDb.collection("shops").doc(ALICE_UID).collection("orders").doc("order_no_num").update({
+      suitCount: 2,
+      deliveryDateMillis: Date.now() + 86400000 * 3,
+      orderStatus: "READY",
+      notes: "Urgent stitch",
+      version: 3,
+      lastModifiedByDevice: STAFF_PHONE_ID,
+      deleted: false,
+      updatedAtEpochMillis: Date.now(),
+      updatedAt: pastDate(200),
+    })
+  );
+
+  // 6. Active staff member can create an order, record payment, mark PAID, and soft-delete
+  await assertSucceeds(
+    staffDb.collection("shops").doc(ALICE_UID).collection("orders").doc("order_staff_1")
+      .set(orderPayload(ALICE_UID, "cust_1", STAFF_PHONE_ID, 1106))
+  );
+  await assertSucceeds(
+    staffDb.collection("shops").doc(ALICE_UID).collection("payments").doc("pay_staff_1")
+      .set(paymentPayload(ALICE_UID, "order_staff_1", STAFF_PHONE_ID))
+  );
+  await assertSucceeds(
+    staffDb.collection("shops").doc(ALICE_UID).collection("orders").doc("order_staff_1").update({
+      paidAmountPkr: 5000,
+      remainingAmountPkr: 0,
+      paymentStatus: "PAID",
+      version: 2,
+      lastModifiedByDevice: STAFF_PHONE_ID,
+      updatedAtEpochMillis: Date.now(),
+      updatedAt: pastDate(100),
+    })
+  );
+  await assertSucceeds(
+    staffDb.collection("shops").doc(ALICE_UID).collection("orders").doc("order_staff_1").update({
+      suitCount: 2,
+      deliveryDateMillis: Date.now() + 86400000 * 3,
+      orderStatus: "PENDING",
+      notes: "Urgent stitch",
+      version: 3,
+      lastModifiedByDevice: STAFF_PHONE_ID,
+      deleted: true,
+      updatedAtEpochMillis: Date.now(),
+      updatedAt: pastDate(50),
+    })
+  );
+});
+

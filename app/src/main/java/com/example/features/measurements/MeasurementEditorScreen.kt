@@ -413,6 +413,11 @@ fun MeasurementEditorScreen(
               activeMeasurementKey = null
               viewModel.updateField { it.copy(shalwarType = style) }
             },
+            shoulderType = state.shoulderType,
+            onSelectShoulderType = { style ->
+              activeMeasurementKey = null
+              viewModel.updateField { it.copy(shoulderType = style) }
+            },
           )
 
           OutlinedTextField(

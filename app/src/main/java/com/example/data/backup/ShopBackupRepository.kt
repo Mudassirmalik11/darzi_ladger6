@@ -219,27 +219,46 @@ class ShopBackupRepository(
 
     try {
       database.withTransaction {
+        val existingCustomerIds = customerDao.getAllIds().toHashSet()
+        val existingMeasurementIds = measurementDao.getAllIds().toHashSet()
+        val existingOrderIds = orderDao.getAllIds().toHashSet()
+        val existingOrderByNumber = orderDao.getAllAssignedOrderNumbers()
+          .associate { it.orderNumber to it.orderId }
+          .toMutableMap()
+        val existingPaymentIds = paymentDao.getAllIds().toHashSet()
+
         // Verify referential integrity BEFORE modifying anything inside transaction
         for (meas in bundle.measurements) {
-          if (meas.customerId !in customerIdsInBundle && customerDao.getById(meas.customerId) == null) {
+          if (meas.customerId !in customerIdsInBundle && meas.customerId !in existingCustomerIds) {
             throw IllegalArgumentException(
               "Restore aborted: measurement ${meas.measurementId} references missing customer ${meas.customerId}.",
             )
           }
         }
         for (order in bundle.orders) {
-          if (order.customerId !in customerIdsInBundle && customerDao.getById(order.customerId) == null) {
+          if (order.customerId !in customerIdsInBundle && order.customerId !in existingCustomerIds) {
             throw IllegalArgumentException(
               "Restore aborted: order ${order.orderId} references missing customer ${order.customerId}.",
             )
           }
         }
         for (payment in bundle.payments) {
-          if (payment.orderId !in orderIdsInBundle && orderDao.getById(payment.orderId) == null) {
+          if (payment.orderId !in orderIdsInBundle && payment.orderId !in existingOrderIds) {
             throw IllegalArgumentException(
               "Restore aborted: payment ${payment.paymentId} references missing order ${payment.orderId}.",
             )
           }
+        }
+
+        val activeOutboxKeys = if (enqueueSync) {
+          outboxDao.getActiveEntityKeys().toHashSet()
+        } else {
+          emptySet()
+        }
+        val outboxToEnqueue = if (enqueueSync) ArrayList<SyncOutboxEntity>(
+          1 + bundle.customers.size + bundle.measurements.size + bundle.orders.size + bundle.payments.size,
+        ) else {
+          null
         }
 
         // Resolve canonical primary shop row
@@ -259,8 +278,8 @@ class ShopBackupRepository(
           version = maxOf(bundle.shop?.version ?: 1L, currentPrimary?.version ?: 1L),
         )
         shopDao.upsert(shopToSave)
-        if (enqueueSync && outboxDao.countActiveForEntity(SyncEntityType.SHOP, shopToSave.shopId) == 0) {
-          outboxDao.enqueue(
+        if (outboxToEnqueue != null && "${SyncEntityType.SHOP.name}:${shopToSave.shopId}" !in activeOutboxKeys) {
+          outboxToEnqueue.add(
             SyncOutboxEntity(
               eventId = UUID.randomUUID().toString(),
               entityType = SyncEntityType.SHOP,
@@ -272,91 +291,161 @@ class ShopBackupRepository(
           )
         }
 
-        // Customers
-        bundle.customers.forEach { rawCustomer ->
-          val customer = rawCustomer.copy(shopId = resolvedShopId)
-          val existed = customerDao.getById(customer.customerId) != null
-          customerDao.insert(customer)
-          if (enqueueSync && outboxDao.countActiveForEntity(SyncEntityType.CUSTOMER, customer.customerId) == 0) {
-            outboxDao.enqueue(
+        val activeDeviceId = if (enqueueSync) {
+          database.deviceSyncDao().getDeviceConfig()?.deviceId?.takeIf { it.isNotBlank() }
+        } else {
+          null
+        }
+
+        // Customers (staggered +1ms after SHOP for chronological dependency order)
+        val customersToSave = ArrayList<CustomerEntity>(bundle.customers.size)
+        for (rawCustomer in bundle.customers) {
+          val customer = rawCustomer.copy(
+            shopId = resolvedShopId,
+            lastModifiedByDevice = activeDeviceId ?: rawCustomer.lastModifiedByDevice,
+          )
+          customersToSave.add(customer)
+          if (outboxToEnqueue != null && "${SyncEntityType.CUSTOMER.name}:${customer.customerId}" !in activeOutboxKeys) {
+            val existed = customer.customerId in existingCustomerIds
+            outboxToEnqueue.add(
               SyncOutboxEntity(
                 eventId = UUID.randomUUID().toString(),
                 entityType = SyncEntityType.CUSTOMER,
                 entityId = customer.customerId,
                 operation = if (existed) SyncOperation.UPDATE else SyncOperation.CREATE,
                 payloadJson = compactJson.encodeToString(customer),
-                createdAt = nowMillis,
+                createdAt = nowMillis + 1L,
               ),
             )
           }
         }
+        if (customersToSave.isNotEmpty()) {
+          customerDao.insertAll(customersToSave)
+        }
 
-        // Measurements
-        bundle.measurements.forEach { meas ->
-          val existed = measurementDao.getById(meas.measurementId) != null
-          measurementDao.insert(meas)
+        // Measurements (staggered +2ms after CUSTOMER)
+        val measurementsToSave = ArrayList<MeasurementEntity>(bundle.measurements.size)
+        val customerIdsWithNewCurrent = LinkedHashSet<String>()
+        for (rawMeas in bundle.measurements) {
+          val meas = if (activeDeviceId != null) {
+            rawMeas.copy(lastModifiedByDevice = activeDeviceId)
+          } else {
+            rawMeas
+          }
+          measurementsToSave.add(meas)
           if (meas.isCurrent && !meas.isDeleted) {
-            measurementDao.clearCurrentFlagExcept(meas.customerId, meas.measurementId, nowMillis)
+            customerIdsWithNewCurrent.add(meas.customerId)
           }
-          if (enqueueSync && outboxDao.countActiveForEntity(SyncEntityType.MEASUREMENT, meas.measurementId) == 0) {
-            outboxDao.enqueue(
-              SyncOutboxEntity(
-                eventId = UUID.randomUUID().toString(),
-                entityType = SyncEntityType.MEASUREMENT,
-                entityId = meas.measurementId,
-                operation = if (existed) SyncOperation.UPDATE else SyncOperation.CREATE,
-                payloadJson = compactJson.encodeToString(meas),
-                createdAt = nowMillis,
-              ),
-            )
+        }
+        // Ensure at most one restored measurement per customer stays marked isCurrent
+        if (measurementsToSave.size > 1) {
+          val lastCurrentByCustomer = HashMap<String, String>()
+          for (meas in measurementsToSave) {
+            if (meas.isCurrent && !meas.isDeleted) {
+              lastCurrentByCustomer[meas.customerId] = meas.measurementId
+            }
+          }
+          for (i in measurementsToSave.indices) {
+            val meas = measurementsToSave[i]
+            if (meas.isCurrent && !meas.isDeleted && lastCurrentByCustomer[meas.customerId] != meas.measurementId) {
+              measurementsToSave[i] = meas.copy(isCurrent = false)
+            }
+          }
+        }
+        if (customerIdsWithNewCurrent.isNotEmpty()) {
+          customerIdsWithNewCurrent.toList().chunked(400).forEach { chunk ->
+            measurementDao.clearCurrentFlagForCustomers(chunk, nowMillis)
+          }
+        }
+        if (measurementsToSave.isNotEmpty()) {
+          measurementDao.insertAll(measurementsToSave)
+        }
+        if (outboxToEnqueue != null) {
+          for (meas in measurementsToSave) {
+            if ("${SyncEntityType.MEASUREMENT.name}:${meas.measurementId}" !in activeOutboxKeys) {
+              val existed = meas.measurementId in existingMeasurementIds
+              outboxToEnqueue.add(
+                SyncOutboxEntity(
+                  eventId = UUID.randomUUID().toString(),
+                  entityType = SyncEntityType.MEASUREMENT,
+                  entityId = meas.measurementId,
+                  operation = if (existed) SyncOperation.UPDATE else SyncOperation.CREATE,
+                  payloadJson = compactJson.encodeToString(meas),
+                  createdAt = nowMillis + 2L,
+                ),
+              )
+            }
           }
         }
 
-        // Orders (protect unique orderNumber index against cross-order collisions)
-        bundle.orders.forEach { rawOrder ->
+        // Orders (staggered +3ms; protect unique orderNumber index against cross-order collisions)
+        val ordersToSave = ArrayList<OrderEntity>(bundle.orders.size)
+        for (rawOrder in bundle.orders) {
           val num = rawOrder.orderNumber
-          val safeOrder = if (num != null) {
-            val holder = orderDao.getByOrderNumber(num)
-            if (holder != null && holder.orderId != rawOrder.orderId) {
+          val baseOrder = if (num != null) {
+            val holderOrderId = existingOrderByNumber[num]
+            if (holderOrderId != null && holderOrderId != rawOrder.orderId) {
               rawOrder.copy(shopId = resolvedShopId, orderNumber = null)
             } else {
+              existingOrderByNumber[num] = rawOrder.orderId
               rawOrder.copy(shopId = resolvedShopId)
             }
           } else {
             rawOrder.copy(shopId = resolvedShopId)
           }
-          val existed = orderDao.getById(safeOrder.orderId) != null
-          orderDao.insert(safeOrder)
-          if (enqueueSync && outboxDao.countActiveForEntity(SyncEntityType.ORDER, safeOrder.orderId) == 0) {
-            outboxDao.enqueue(
+          val safeOrder = if (activeDeviceId != null) {
+            baseOrder.copy(lastModifiedByDevice = activeDeviceId)
+          } else {
+            baseOrder
+          }
+          ordersToSave.add(safeOrder)
+          if (outboxToEnqueue != null && "${SyncEntityType.ORDER.name}:${safeOrder.orderId}" !in activeOutboxKeys) {
+            val existed = safeOrder.orderId in existingOrderIds
+            outboxToEnqueue.add(
               SyncOutboxEntity(
                 eventId = UUID.randomUUID().toString(),
                 entityType = SyncEntityType.ORDER,
                 entityId = safeOrder.orderId,
                 operation = if (existed) SyncOperation.UPDATE else SyncOperation.CREATE,
                 payloadJson = compactJson.encodeToString(safeOrder),
-                createdAt = nowMillis,
+                createdAt = nowMillis + 3L,
               ),
             )
           }
         }
+        if (ordersToSave.isNotEmpty()) {
+          orderDao.insertAll(ordersToSave)
+        }
 
-        // Payments
-        bundle.payments.forEach { payment ->
-          val existed = paymentDao.getById(payment.paymentId) != null
-          paymentDao.upsertForRestore(payment)
-          if (enqueueSync && !existed && outboxDao.countActiveForEntity(SyncEntityType.PAYMENT, payment.paymentId) == 0) {
-            outboxDao.enqueue(
+        // Payments (staggered +4ms)
+        val paymentsToSave = ArrayList<PaymentEntity>(bundle.payments.size)
+        for (rawPayment in bundle.payments) {
+          val payment = if (activeDeviceId != null && (rawPayment.deviceId.isBlank() || rawPayment.deviceId == "csv-import")) {
+            rawPayment.copy(deviceId = activeDeviceId)
+          } else {
+            rawPayment
+          }
+          paymentsToSave.add(payment)
+          val existed = payment.paymentId in existingPaymentIds
+          if (outboxToEnqueue != null && !existed && "${SyncEntityType.PAYMENT.name}:${payment.paymentId}" !in activeOutboxKeys) {
+            outboxToEnqueue.add(
               SyncOutboxEntity(
                 eventId = UUID.randomUUID().toString(),
                 entityType = SyncEntityType.PAYMENT,
                 entityId = payment.paymentId,
                 operation = SyncOperation.CREATE,
                 payloadJson = compactJson.encodeToString(payment),
-                createdAt = nowMillis,
+                createdAt = nowMillis + 4L,
               ),
             )
           }
+        }
+        if (paymentsToSave.isNotEmpty()) {
+          paymentDao.upsertAllForRestore(paymentsToSave)
+        }
+
+        if (outboxToEnqueue != null && outboxToEnqueue.isNotEmpty()) {
+          outboxDao.enqueueAll(outboxToEnqueue)
         }
       }
 
@@ -383,6 +472,15 @@ class ShopBackupRepository(
       )
     }
   }
+
+  fun convertCsvToBackupJson(
+    rawCsv: String,
+    nowMillis: Long = System.currentTimeMillis(),
+  ): Result<String> = UrduSheetCsvParser.convertCsvToBackupJson(
+    rawCsv = rawCsv,
+    compactJson = compactJson,
+    nowMillis = nowMillis,
+  )
 
   companion object {
     const val CURRENT_SCHEMA_VERSION = 1

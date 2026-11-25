@@ -687,6 +687,8 @@ fun CreateOrderScreen(
             onSelectSilaiStyle = { style -> viewModel.updateForm { it.copy(silaiStyle = style) } },
             shalwarType = state.shalwarType,
             onSelectShalwarType = { style -> viewModel.updateForm { it.copy(shalwarType = style) } },
+            shoulderType = state.shoulderType,
+            onSelectShoulderType = { style -> viewModel.updateForm { it.copy(shoulderType = style) } },
             footerContent = {
               HorizontalDivider(color = dividerColor)
               Row(

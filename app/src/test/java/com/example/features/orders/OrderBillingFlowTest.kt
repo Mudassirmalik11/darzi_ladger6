@@ -356,7 +356,7 @@ class OrderBillingFlowTest {
         damanStyle = DamanStyle.GOL,
         pocketStyle = PocketStyle.TWO_SIDE,
         sleeveStyle = SleeveStyle.STUDS,
-        silaiStyle = SilaiStyle.CHAMAK_DHAGA,
+        silaiStyle = SilaiStyle.KAMDO_DHAGA,
         label = "Shalwar Kameez",
         deviceId = "phone-1",
         nowMillis = 3_000L,

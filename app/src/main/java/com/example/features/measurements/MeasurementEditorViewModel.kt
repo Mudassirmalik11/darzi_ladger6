@@ -9,6 +9,7 @@ import com.example.core.model.MeasurementSnapshot
 import com.example.core.model.NeckStyle
 import com.example.core.model.PocketStyle
 import com.example.core.model.ShalwarType
+import com.example.core.model.ShoulderType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.TailorValidators
@@ -43,6 +44,7 @@ data class MeasurementFormState(
   val sleeveStyle: SleeveStyle? = null,
   val silaiStyle: SilaiStyle? = null,
   val shalwarType: ShalwarType? = null,
+  val shoulderType: ShoulderType? = null,
   val notes: String = "",
   val isLoaded: Boolean = false,
   val isSaving: Boolean = false,
@@ -117,6 +119,7 @@ class MeasurementEditorViewModel(
             sleeveStyle = seed.sleeveStyle,
             silaiStyle = seed.silaiStyle,
             shalwarType = seed.shalwarType,
+            shoulderType = seed.shoulderType,
             notes = seed.notes,
             isLoaded = true,
           )
@@ -157,6 +160,7 @@ class MeasurementEditorViewModel(
         sleeveStyle = measurement.sleeveStyle,
         silaiStyle = measurement.silaiStyle,
         shalwarType = measurement.shalwarType,
+        shoulderType = measurement.shoulderType,
         notes = measurement.notes,
         hasAttemptedSave = false,
         errorMessage = null,
@@ -269,6 +273,7 @@ class MeasurementEditorViewModel(
           sleeveStyle = s.sleeveStyle,
           silaiStyle = s.silaiStyle,
           shalwarType = s.shalwarType,
+          shoulderType = s.shoulderType,
           label = persistLabel,
           deviceId = device.deviceId,
         )
@@ -282,6 +287,7 @@ class MeasurementEditorViewModel(
           sleeveStyle = s.sleeveStyle,
           silaiStyle = s.silaiStyle,
           shalwarType = s.shalwarType,
+          shoulderType = s.shoulderType,
           label = persistLabel,
           deviceId = device.deviceId,
         )

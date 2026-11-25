@@ -1,5 +1,6 @@
 package com.example.data.local.repository
 
+import android.util.Log
 import androidx.room.withTransaction
 import com.example.core.model.MeasurementSnapshot
 import com.example.core.model.OrderStatus
@@ -17,6 +18,9 @@ import com.example.data.local.daos.OrderWithCustomer
 import com.example.data.local.daos.PaymentAnalyticsRow
 import com.example.data.local.database.DarziDatabase
 import com.example.data.local.entities.OrderEntity
+import com.example.data.local.entities.OrderSyncLogEntity
+import com.example.data.local.entities.OrderSyncLogOperation
+import com.example.data.local.entities.OrderSyncLogStatus
 import com.example.data.local.entities.PaymentEntity
 import com.example.data.local.entities.SyncOutboxEntity
 import java.util.UUID
@@ -33,6 +37,7 @@ class OrderRepository(
   private val customerDao = database.customerDao()
   private val deviceSyncDao = database.deviceSyncDao()
   private val outboxDao = database.syncOutboxDao()
+  private val orderSyncLogDao = database.orderSyncLogDao()
   private val json = Json { encodeDefaults = true }
 
   fun observeAllOrders(): Flow<List<OrderWithCustomer>> =
@@ -173,6 +178,13 @@ class OrderRepository(
             ),
           )
         }
+        logOrderQueued(
+          order = order,
+          operation = OrderSyncLogOperation.CREATE,
+          summary = "Queued new order (${order.suitCount} suit(s), Rs. ${order.totalAmountPkr}, ${order.paymentStatus.name})",
+          deviceId = deviceId,
+          timestamp = nowMillis,
+        )
         order
       }
     }
@@ -240,6 +252,13 @@ class OrderRepository(
           createdAt = nowMillis,
         ),
       )
+      logOrderQueued(
+        order = updatedOrder,
+        operation = OrderSyncLogOperation.PAYMENT,
+        summary = "Queued payment Rs. $amountPkr -> ${updatedOrder.paymentStatus.name} (paid Rs. ${updatedOrder.paidAmountPkr}/${updatedOrder.totalAmountPkr})",
+        deviceId = deviceId,
+        timestamp = nowMillis,
+      )
       updatedOrder
     }
   }
@@ -298,6 +317,13 @@ class OrderRepository(
           createdAt = nowMillis,
         ),
       )
+      logOrderQueued(
+        order = updated,
+        operation = OrderSyncLogOperation.STATUS,
+        summary = "Queued status ${order.orderStatus.name} -> ${targetStatus.name}",
+        deviceId = deviceId,
+        timestamp = nowMillis,
+      )
       updated
     }
   }
@@ -329,6 +355,13 @@ class OrderRepository(
           createdAt = nowMillis,
         ),
       )
+      logOrderQueued(
+        order = updated,
+        operation = OrderSyncLogOperation.DELETE,
+        summary = "Queued order soft-delete (status=${updated.orderStatus.name})",
+        deviceId = deviceId,
+        timestamp = nowMillis,
+      )
     }
   }
 
@@ -357,6 +390,13 @@ class OrderRepository(
           createdAt = nowMillis,
         ),
       )
+      logOrderQueued(
+        order = updated,
+        operation = OrderSyncLogOperation.ORDER_NUMBER,
+        summary = "Assigned official order number #$number",
+        deviceId = deviceId,
+        timestamp = nowMillis,
+      )
       assignedCount += 1
     }
     assignedCount
@@ -383,6 +423,31 @@ class OrderRepository(
       )
     )
     return assigned
+  }
+
+  private suspend fun logOrderQueued(
+    order: OrderEntity,
+    operation: String,
+    summary: String,
+    deviceId: String,
+    timestamp: Long,
+  ) {
+    orderSyncLogDao.insert(
+      OrderSyncLogEntity(
+        logId = UUID.randomUUID().toString(),
+        orderId = order.orderId,
+        orderNumber = order.orderNumber,
+        operation = operation,
+        status = OrderSyncLogStatus.QUEUED,
+        summary = summary,
+        deviceId = deviceId,
+        orderVersion = order.version,
+        timestamp = timestamp,
+      ),
+    )
+    runCatching {
+      Log.i("OrderSyncLog", "[QUEUED][$operation] order=${order.orderNumber ?: order.orderId} v${order.version}: $summary")
+    }
   }
 
   private fun computePaymentStatus(totalAmountPkr: Long, paidAmountPkr: Long): PaymentStatus =

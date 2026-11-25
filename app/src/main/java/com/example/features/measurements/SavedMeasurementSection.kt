@@ -29,6 +29,7 @@ import com.example.core.model.NeckStyle
 import com.example.core.model.PocketStyle
 import com.example.core.model.PocketStyleCodec
 import com.example.core.model.ShalwarType
+import com.example.core.model.ShoulderType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.ui.DateFormatUtils
@@ -36,6 +37,7 @@ import com.example.features.customers.localizedDamanStyle
 import com.example.features.customers.localizedNeckStyle
 import com.example.features.customers.localizedPocketStyles
 import com.example.features.customers.localizedShalwarType
+import com.example.features.customers.localizedShoulderType
 import com.example.features.customers.localizedSilaiStyle
 import com.example.features.customers.localizedSleeveStyle
 import com.example.ui.theme.JetBrainsMonoFamily
@@ -261,6 +263,7 @@ fun SavedStylePreferencesGrid(
   mutedText: Color,
   modifier: Modifier = Modifier,
   shalwarType: ShalwarType? = null,
+  shoulderType: ShoulderType? = null,
 ) {
   val orderedPockets = PocketStyleCodec.ordered(pocketStyles)
   val styleItems = buildList {
@@ -275,6 +278,9 @@ fun SavedStylePreferencesGrid(
     }
     sleeveStyle?.let {
       add(Triple("sleeves", stringResource(R.string.style_sleeves), localizedSleeveStyle(it)))
+    }
+    shoulderType?.let {
+      add(Triple("shoulder", stringResource(R.string.style_shoulder), localizedShoulderType(it)))
     }
     shalwarType?.let {
       add(Triple("shalwar", stringResource(R.string.style_shalwar), localizedShalwarType(it)))

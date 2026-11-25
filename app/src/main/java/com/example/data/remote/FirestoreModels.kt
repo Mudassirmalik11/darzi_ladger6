@@ -122,6 +122,7 @@ data class MeasurementDoc(
   val sleeveStyle: String = "",
   val silaiStyle: String = "",
   val shalwarType: String = "",
+  val shoulderType: String = "",
   val rawInputsJson: String = "{}",
   val notes: String = "",
   val version: Long = 1L,

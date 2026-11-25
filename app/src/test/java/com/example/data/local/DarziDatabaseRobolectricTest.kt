@@ -14,6 +14,7 @@ import com.example.core.model.PaymentStatus
 import com.example.core.model.PocketStyle
 import com.example.core.model.ShalwarType
 import com.example.core.model.ShopUserRole
+import com.example.core.model.ShoulderType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.SnapshotJson
@@ -75,6 +76,7 @@ class DarziDatabaseRobolectricTest {
     sleeveStyle = SleeveStyle.KAF,
     silaiStyle = SilaiStyle.DOUBLE,
     shalwarType = ShalwarType.BALOCHI,
+    shoulderType = ShoulderType.DOWN_SHOULDER,
   )
 
   @Before
@@ -150,11 +152,13 @@ class DarziDatabaseRobolectricTest {
       sleeveStyle = sampleStyle.sleeveStyle,
       silaiStyle = sampleStyle.silaiStyle,
       shalwarType = sampleStyle.shalwarType,
+      shoulderType = sampleStyle.shoulderType,
       deviceId = "phone-1",
       nowMillis = 1000L,
     ).getOrThrow()
     assertEquals(88.0, m1.shalwarGhair, 0.001)
     assertEquals(ShalwarType.BALOCHI, m1.shalwarType)
+    assertEquals(ShoulderType.DOWN_SHOULDER, m1.shoulderType)
     assertEquals(mapOf("BAZU" to "23/12"), m1.rawInputsMap())
 
     deviceSyncRepo.addOrderNumberReservation(
@@ -368,6 +372,8 @@ class DarziDatabaseRobolectricTest {
         DarziDatabase.MIGRATION_3_4,
         DarziDatabase.MIGRATION_4_5,
         DarziDatabase.MIGRATION_5_6,
+        DarziDatabase.MIGRATION_6_7,
+        DarziDatabase.MIGRATION_7_8,
       )
       .allowMainThreadQueries()
       .build()
@@ -400,6 +406,7 @@ class DarziDatabaseRobolectricTest {
         sleeveStyle = null,
         silaiStyle = null,
         shalwarType = null,
+        shoulderType = null,
         deviceId = device.deviceId,
       ).getOrThrow()
       assertNull(savedMeas.neckStyle)
@@ -407,8 +414,15 @@ class DarziDatabaseRobolectricTest {
       assertNull(savedMeas.sleeveStyle)
       assertNull(savedMeas.silaiStyle)
       assertNull(savedMeas.shalwarType)
+      assertNull(savedMeas.shoulderType)
       assertEquals(88.0, savedMeas.shalwarGhair, 0.001)
       assertEquals(mapOf("BAZU" to "23/12"), savedMeas.rawInputsMap())
+
+      val legacyStyle = com.example.core.model.SnapshotJson.decodeStyle(
+        """{"silaiStyle":"CHAMAK_DHAGA","shoulderType":"HANGER_SHOULDER"}""",
+      )
+      assertEquals(SilaiStyle.KAMDO_DHAGA, legacyStyle.silaiStyle)
+      assertEquals(ShoulderType.HANGER_SHOULDER, legacyStyle.shoulderType)
     }
     migratedDb.close()
     dbFile.delete()

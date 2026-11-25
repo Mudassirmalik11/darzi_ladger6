@@ -8,6 +8,7 @@ import com.example.core.model.SyncStatus
 import com.example.data.local.database.DarziDatabase
 import com.example.data.local.entities.DeviceConfigEntity
 import com.example.data.local.entities.OrderNumberReservationEntity
+import com.example.data.local.entities.OrderSyncLogEntity
 import com.example.data.local.entities.PrinterConfigEntity
 import com.example.data.local.entities.SyncConflictEntity
 import com.example.data.local.entities.SyncMetadataEntity
@@ -20,10 +21,21 @@ class DeviceSyncRepository(
 ) {
   private val deviceSyncDao = database.deviceSyncDao()
   private val outboxDao = database.syncOutboxDao()
+  private val orderSyncLogDao = database.orderSyncLogDao()
 
   fun observeDeviceConfig(): Flow<DeviceConfigEntity?> = deviceSyncDao.observeDeviceConfig()
 
   fun observePendingOutboxCount(): Flow<Int> = outboxDao.observePendingCount()
+
+  fun observeFailedOutboxCount(): Flow<Int> = outboxDao.observeFailedCount()
+
+  fun observeRecentOrderSyncLogs(limit: Int = 60): Flow<List<OrderSyncLogEntity>> =
+    orderSyncLogDao.observeRecentLogs(limit)
+
+  fun observeOrderSyncLogs(orderId: String): Flow<List<OrderSyncLogEntity>> =
+    orderSyncLogDao.observeLogsForOrder(orderId)
+
+  suspend fun clearOrderSyncLogs() = orderSyncLogDao.clearLogs()
 
   fun observeDefaultPrinter(): Flow<PrinterConfigEntity?> = deviceSyncDao.observeDefaultPrinter()
 
@@ -164,6 +176,7 @@ class DeviceSyncRepository(
       deviceSyncDao.clearCustomers()
       deviceSyncDao.clearOutbox()
       deviceSyncDao.clearConflicts()
+      deviceSyncDao.clearOrderSyncLogs()
       deviceSyncDao.clearReservations()
       deviceSyncDao.clearShops()
     }

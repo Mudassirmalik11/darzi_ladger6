@@ -7,6 +7,7 @@ import com.example.core.model.NeckStyle
 import com.example.core.model.PhoneNumberUtils
 import com.example.core.model.PocketStyle
 import com.example.core.model.ShalwarType
+import com.example.core.model.ShoulderType
 import com.example.core.model.SilaiStyle
 import com.example.core.model.SleeveStyle
 import com.example.core.model.SnapshotJson
@@ -32,6 +33,9 @@ class CustomerRepository(
   private val json = Json { encodeDefaults = true }
 
   fun observeAllCustomers(): Flow<List<CustomerEntity>> = customerDao.observeAllActive()
+
+  fun observeCustomerIdsWithMeasurements(): Flow<List<String>> =
+    measurementDao.observeCustomerIdsWithMeasurements()
 
   fun observeCustomerCount(): Flow<Int> = customerDao.observeActiveCount()
 
@@ -209,6 +213,7 @@ class CustomerRepository(
     sleeveStyle: SleeveStyle? = null,
     silaiStyle: SilaiStyle? = null,
     shalwarType: ShalwarType? = null,
+    shoulderType: ShoulderType? = null,
     label: String = "Standard",
     deviceId: String,
     nowMillis: Long = System.currentTimeMillis(),
@@ -221,6 +226,7 @@ class CustomerRepository(
     sleeveStyle = sleeveStyle,
     silaiStyle = silaiStyle,
     shalwarType = shalwarType,
+    shoulderType = shoulderType,
     label = label,
     deviceId = deviceId,
     nowMillis = nowMillis,
@@ -235,6 +241,7 @@ class CustomerRepository(
     sleeveStyle: SleeveStyle? = null,
     silaiStyle: SilaiStyle? = null,
     shalwarType: ShalwarType? = null,
+    shoulderType: ShoulderType? = null,
     label: String = "Standard",
     deviceId: String,
     nowMillis: Long = System.currentTimeMillis(),
@@ -248,6 +255,26 @@ class CustomerRepository(
       database.withTransaction {
         customerDao.getById(customerId)
           ?: throw IllegalStateException("Customer does not exist.")
+        val previousCurrentList = measurementDao.getAllCurrentForCustomer(customerId)
+        for (prev in previousCurrentList) {
+          val clearedPrev = prev.copy(
+            isCurrent = false,
+            updatedAt = nowMillis,
+            version = prev.version + 1L,
+            lastModifiedByDevice = deviceId,
+          )
+          measurementDao.insert(clearedPrev)
+          outboxDao.enqueue(
+            SyncOutboxEntity(
+              eventId = UUID.randomUUID().toString(),
+              entityType = SyncEntityType.MEASUREMENT,
+              entityId = clearedPrev.measurementId,
+              operation = SyncOperation.UPDATE,
+              payloadJson = json.encodeToString(clearedPrev),
+              createdAt = nowMillis,
+            ),
+          )
+        }
         measurementDao.clearCurrentFlagForCustomer(customerId, nowMillis)
 
         val entity = MeasurementEntity(
@@ -273,6 +300,7 @@ class CustomerRepository(
           sleeveStyle = sleeveStyle,
           silaiStyle = silaiStyle,
           shalwarType = shalwarType,
+          shoulderType = shoulderType,
           rawInputsJson = SnapshotJson.encodeRawMap(snapshot.rawValues),
           notes = snapshot.notes.trim(),
           createdAt = nowMillis,
@@ -306,6 +334,7 @@ class CustomerRepository(
     sleeveStyle: SleeveStyle? = null,
     silaiStyle: SilaiStyle? = null,
     shalwarType: ShalwarType? = null,
+    shoulderType: ShoulderType? = null,
     label: String = "Standard",
     deviceId: String,
     nowMillis: Long = System.currentTimeMillis(),
@@ -319,6 +348,7 @@ class CustomerRepository(
     sleeveStyle = sleeveStyle,
     silaiStyle = silaiStyle,
     shalwarType = shalwarType,
+    shoulderType = shoulderType,
     label = label,
     deviceId = deviceId,
     nowMillis = nowMillis,
@@ -334,6 +364,7 @@ class CustomerRepository(
     sleeveStyle: SleeveStyle? = null,
     silaiStyle: SilaiStyle? = null,
     shalwarType: ShalwarType? = null,
+    shoulderType: ShoulderType? = null,
     label: String = "Standard",
     deviceId: String,
     nowMillis: Long = System.currentTimeMillis(),
@@ -369,6 +400,7 @@ class CustomerRepository(
           sleeveStyle = sleeveStyle,
           silaiStyle = silaiStyle,
           shalwarType = shalwarType,
+          shoulderType = shoulderType,
           rawInputsJson = SnapshotJson.encodeRawMap(snapshot.rawValues),
           notes = snapshot.notes.trim(),
           updatedAt = nowMillis,
@@ -402,8 +434,9 @@ class CustomerRepository(
         ?.takeIf { it.customerId == customerId && !it.isDeleted }
         ?: throw IllegalStateException("Measurement record not found.")
 
-      val previousCurrent = measurementDao.getCurrentForCustomer(customerId)
-      if (previousCurrent != null && previousCurrent.measurementId != target.measurementId) {
+      val previousCurrentList = measurementDao.getAllCurrentForCustomer(customerId)
+        .filter { it.measurementId != target.measurementId }
+      for (previousCurrent in previousCurrentList) {
         val clearedPrev = previousCurrent.copy(
           isCurrent = false,
           updatedAt = nowMillis,

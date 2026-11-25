@@ -1180,6 +1180,7 @@ private fun MeasurementTabSection(
         sleeveStyle = styleSnapshot.sleeveStyle,
         silaiStyle = styleSnapshot.silaiStyle,
         shalwarType = styleSnapshot.shalwarType,
+        shoulderType = styleSnapshot.shoulderType,
         dividerColor = dividerColor,
         primaryText = primaryText,
         mutedText = mutedText,

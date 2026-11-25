@@ -370,7 +370,9 @@ class ThermalReceiptFormatterTest {
     val (detail, meas) = sampleOrder(orderNumber = 1042, customerName = "Junaid")
     val style = SnapshotJson.decodeStyle(detail.order.styleSnapshotJson).copy(
       sleeveStyle = SleeveStyle.KAF,
+      shoulderType = com.example.core.model.ShoulderType.FULL_DOWN_SHOULDER,
       shalwarType = com.example.core.model.ShalwarType.BALOCHI,
+      silaiStyle = SilaiStyle.KAMDO_DHAGA,
     )
     val measWithDualAndGhair = meas.copy(
       shalwarGhair = 92.0,
@@ -396,7 +398,9 @@ class ThermalReceiptFormatterTest {
     assertEquals("اضافی نوٹ", urduParchi.additionalNotesTitle)
     assertTrue(urduParchi.additionalNoteLines.any { it.contains("بین") })
     assertTrue(urduParchi.additionalNoteLines.any { it.contains("کف") })
+    assertTrue(urduParchi.additionalNoteLines.any { it.contains("فل ڈاؤن شولڈر") })
     assertTrue(urduParchi.additionalNoteLines.any { it.contains("بلوچی") })
+    assertTrue(urduParchi.additionalNoteLines.any { it.contains("کمدو دھاگہ") })
 
     val englishMinimalParchi = ThermalReceiptFormatter.buildKarigarParchiData(
       shopName = "Al-Rehman Tailors",
@@ -410,7 +414,9 @@ class ThermalReceiptFormatterTest {
       ),
       style = StyleSnapshot(
         sleeveStyle = SleeveStyle.KURTA,
+        shoulderType = com.example.core.model.ShoulderType.HANGER_SHOULDER,
         shalwarType = com.example.core.model.ShalwarType.SMART,
+        silaiStyle = SilaiStyle.KAMDO_DHAGA,
       ),
       language = AppLanguage.ENGLISH,
     )
@@ -424,7 +430,9 @@ class ThermalReceiptFormatterTest {
     assertEquals("23/12\"", englishMinimalParchi.compulsoryMetrics.first { it.label == "Asteen" }.value)
     assertEquals(listOf("Shalwar Ghair"), englishMinimalParchi.optionalMetrics.map { it.label })
     assertTrue(englishMinimalParchi.additionalNoteLines.any { it.contains("Kurta") })
+    assertTrue(englishMinimalParchi.additionalNoteLines.any { it.contains("Hanger Shoulder") })
     assertTrue(englishMinimalParchi.additionalNoteLines.any { it.contains("Smart") })
+    assertTrue(englishMinimalParchi.additionalNoteLines.any { it.contains("Kamdo Dhaga") })
   }
 
   @Test

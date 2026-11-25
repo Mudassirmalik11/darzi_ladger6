@@ -207,6 +207,8 @@ private fun AuthenticatedShopShell(
     val syncState by appContainer.syncEngine.syncState.collectAsStateWithLifecycle()
     val pendingSyncCount by appContainer.deviceSyncRepository.observePendingOutboxCount()
       .collectAsStateWithLifecycle(initialValue = 0)
+    val failedSyncCount by appContainer.deviceSyncRepository.observeFailedOutboxCount()
+      .collectAsStateWithLifecycle(initialValue = 0)
     val conflictCount by appContainer.deviceSyncRepository.observeUnresolvedConflictCount()
       .collectAsStateWithLifecycle(initialValue = 0)
 
@@ -257,6 +259,11 @@ private fun AuthenticatedShopShell(
           stringResource(R.string.sync_status_syncing),
           Icons.Filled.CloudSync,
           MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+        syncState == SyncState.ERROR || failedSyncCount > 0 -> Triple(
+          stringResource(R.string.sync_status_error),
+          Icons.Filled.WarningAmber,
+          MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer,
         )
         pendingSyncCount > 0 -> Triple(
           stringResource(R.string.sync_status_pending, pendingSyncCount),

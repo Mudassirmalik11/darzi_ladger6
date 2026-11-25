@@ -35,6 +35,7 @@ data class CustomerListItem(
   val customer: CustomerEntity,
   val displayId: String,
   val sequenceNumber: Int,
+  val hasMeasurement: Boolean = true,
 )
 
 data class DuplicateCustomerPrompt(
@@ -62,6 +63,9 @@ class CustomersViewModel(
   private val _onlyWithAddress = MutableStateFlow(false)
   val onlyWithAddress: StateFlow<Boolean> = _onlyWithAddress.asStateFlow()
 
+  private val _onlyWithoutMeasurements = MutableStateFlow(false)
+  val onlyWithoutMeasurements: StateFlow<Boolean> = _onlyWithoutMeasurements.asStateFlow()
+
   private val _selectedCustomerId = MutableStateFlow<String?>(null)
   val selectedCustomerId: StateFlow<String?> = _selectedCustomerId.asStateFlow()
 
@@ -73,11 +77,14 @@ class CustomersViewModel(
 
   val customerItems: StateFlow<List<CustomerListItem>> = combine(
     customerRepository.observeAllCustomers(),
+    customerRepository.observeCustomerIdsWithMeasurements(),
     _searchQuery,
     _searchScope,
-    _sortOrder,
-    _onlyWithAddress,
-  ) { allCustomers, query, scope, sort, addressOnly ->
+    combine(_sortOrder, _onlyWithAddress, _onlyWithoutMeasurements) { sort, addressOnly, withoutMeasurementsOnly ->
+      Triple(sort, addressOnly, withoutMeasurementsOnly)
+    },
+  ) { allCustomers, customerIdsWithMeasurements, query, scope, (sort, addressOnly, withoutMeasurementsOnly) ->
+    val measuredCustomerIds = customerIdsWithMeasurements.toHashSet()
     val chronological = allCustomers.sortedWith(
       compareBy<CustomerEntity> { it.createdAt }.thenBy { it.customerId },
     )
@@ -88,6 +95,7 @@ class CustomersViewModel(
         customer = customer,
         displayId = resolvedDisplayId,
         sequenceNumber = sequenceNumber,
+        hasMeasurement = customer.customerId in measuredCustomerIds,
       )
     }
 
@@ -102,6 +110,7 @@ class CustomersViewModel(
     val filtered = indexed.filter { item ->
       val c = item.customer
       if (addressOnly && c.notes.isBlank()) return@filter false
+      if (withoutMeasurementsOnly && item.hasMeasurement) return@filter false
       if (trimmed.isEmpty()) return@filter true
 
       val matchesName = c.name.contains(trimmed, ignoreCase = true)
@@ -154,6 +163,10 @@ class CustomersViewModel(
 
   fun toggleOnlyWithAddress() {
     _onlyWithAddress.value = !_onlyWithAddress.value
+  }
+
+  fun toggleOnlyWithoutMeasurements() {
+    _onlyWithoutMeasurements.value = !_onlyWithoutMeasurements.value
   }
 
   fun selectCustomer(customerId: String?) {

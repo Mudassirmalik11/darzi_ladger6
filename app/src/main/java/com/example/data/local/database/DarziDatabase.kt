@@ -11,6 +11,7 @@ import com.example.data.local.daos.CustomerDao
 import com.example.data.local.daos.DeviceSyncDao
 import com.example.data.local.daos.MeasurementDao
 import com.example.data.local.daos.OrderDao
+import com.example.data.local.daos.OrderSyncLogDao
 import com.example.data.local.daos.PaymentDao
 import com.example.data.local.daos.ShopDao
 import com.example.data.local.daos.SyncOutboxDao
@@ -19,6 +20,7 @@ import com.example.data.local.entities.DeviceConfigEntity
 import com.example.data.local.entities.MeasurementEntity
 import com.example.data.local.entities.OrderEntity
 import com.example.data.local.entities.OrderNumberReservationEntity
+import com.example.data.local.entities.OrderSyncLogEntity
 import com.example.data.local.entities.PaymentEntity
 import com.example.data.local.entities.PrinterConfigEntity
 import com.example.data.local.entities.ShopEntity
@@ -39,8 +41,9 @@ import com.example.data.local.entities.SyncOutboxEntity
     OrderNumberReservationEntity::class,
     PrinterConfigEntity::class,
     SyncConflictEntity::class,
+    OrderSyncLogEntity::class,
   ],
-  version = 6,
+  version = 8,
   exportSchema = true,
 )
 @TypeConverters(DarziConverters::class)
@@ -52,6 +55,7 @@ abstract class DarziDatabase : RoomDatabase() {
   abstract fun paymentDao(): PaymentDao
   abstract fun syncOutboxDao(): SyncOutboxDao
   abstract fun deviceSyncDao(): DeviceSyncDao
+  abstract fun orderSyncLogDao(): OrderSyncLogDao
 
   companion object {
     const val DATABASE_NAME = "darzi_ledger.db"
@@ -182,6 +186,45 @@ abstract class DarziDatabase : RoomDatabase() {
       }
     }
 
+    val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          """
+          CREATE TABLE IF NOT EXISTS `order_sync_logs` (
+            `logId` TEXT NOT NULL,
+            `orderId` TEXT NOT NULL,
+            `orderNumber` INTEGER,
+            `operation` TEXT NOT NULL,
+            `status` TEXT NOT NULL,
+            `summary` TEXT NOT NULL,
+            `errorMessage` TEXT,
+            `deviceId` TEXT NOT NULL,
+            `orderVersion` INTEGER NOT NULL,
+            `timestamp` INTEGER NOT NULL,
+            PRIMARY KEY(`logId`)
+          )
+          """.trimIndent(),
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS `index_order_sync_logs_orderId` ON `order_sync_logs` (`orderId`)",
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS `index_order_sync_logs_timestamp` ON `order_sync_logs` (`timestamp`)",
+        )
+        db.execSQL(
+          "CREATE INDEX IF NOT EXISTS `index_order_sync_logs_status` ON `order_sync_logs` (`status`)",
+        )
+      }
+    }
+
+    val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+          "ALTER TABLE `measurements` ADD COLUMN `shoulderType` TEXT",
+        )
+      }
+    }
+
     @Volatile
     private var INSTANCE: DarziDatabase? = null
 
@@ -198,6 +241,8 @@ abstract class DarziDatabase : RoomDatabase() {
             MIGRATION_3_4,
             MIGRATION_4_5,
             MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
           )
           .build()
           .also { INSTANCE = it }

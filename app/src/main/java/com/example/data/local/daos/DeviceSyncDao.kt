@@ -47,6 +47,9 @@ interface DeviceSyncDao {
   @Query("DELETE FROM sync_conflicts")
   suspend fun clearConflicts()
 
+  @Query("DELETE FROM order_sync_logs")
+  suspend fun clearOrderSyncLogs()
+
   @Query("DELETE FROM order_number_reservations")
   suspend fun clearReservations()
 

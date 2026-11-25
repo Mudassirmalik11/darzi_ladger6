@@ -780,6 +780,7 @@ private fun MeasurementProfileCard(
         sleeveStyle = entry.sleeveStyle,
         silaiStyle = entry.silaiStyle,
         shalwarType = entry.shalwarType,
+        shoulderType = entry.shoulderType,
         dividerColor = dividerColor,
         primaryText = primaryText,
         mutedText = mutedText,

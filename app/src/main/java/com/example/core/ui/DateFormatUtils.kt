@@ -48,6 +48,7 @@ object DateFormatUtils {
   fun formatInches(value: Double, rawOverride: String? = null): String {
     val trimmed = rawOverride?.trim()
     if (!trimmed.isNullOrEmpty()) return "$trimmed\""
+    if (value <= 0.0) return "—"
     val rounded = kotlin.math.round(value * 100.0) / 100.0
     return if (rounded % 1.0 == 0.0) {
       "${rounded.toInt()}\""
